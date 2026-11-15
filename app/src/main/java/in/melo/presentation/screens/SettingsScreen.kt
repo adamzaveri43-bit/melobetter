@@ -393,6 +393,17 @@ private fun PlaybackSettings(model: MeloModel, navController: NavHostController)
     val s by model.ui.settings.collectAsStateWithLifecycle()
     val update = model.ui::updateSettings
     SettingsScaffold(stringResource(R.string.settings_category_playback_title), navController) {
+        ThemeSelectorItem(
+            label = stringResource(R.string.music_sources_title), description = stringResource(R.string.music_sources_description),
+            options = mapOf(
+                `in`.melo.data.preferences.MusicSources.BOTH to stringResource(R.string.music_sources_both),
+                `in`.melo.data.preferences.MusicSources.SPOTIFY to stringResource(R.string.music_sources_spotify),
+                `in`.melo.data.preferences.MusicSources.YOUTUBE to stringResource(R.string.music_sources_youtube),
+            ),
+            selectedKey = s.musicSources,
+            onSelectionChanged = { key -> update { it.copy(musicSources = key) }; model.search(model.discovery.value.query, debounce = false) },
+            leadingIcon = { Icon(Icons.Rounded.LibraryMusic, null, tint = MaterialTheme.colorScheme.secondary) },
+        )
         val streaming = mapOf(
             `in`.melo.data.AudioQuality.AUTO.key to stringResource(R.string.audio_quality_auto),
             `in`.melo.data.AudioQuality.NORMAL.key to stringResource(R.string.audio_quality_normal),

@@ -561,6 +561,7 @@ fun SearchFilterChip(
         SearchFilterType.ALBUMS -> R.string.library_tab_albums
         SearchFilterType.ARTISTS -> R.string.library_tab_artists
         SearchFilterType.PLAYLISTS -> R.string.library_tab_playlists
+        SearchFilterType.VIDEOS -> R.string.search_filter_videos
     }
 
     FilterChip(

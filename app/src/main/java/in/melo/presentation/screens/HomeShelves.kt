@@ -44,6 +44,7 @@ import `in`.melo.ui.theme.MeloLayout
 import `in`.melo.data.Music
 import `in`.melo.data.MusicKind
 import `in`.melo.data.preferences.ShelfStyle
+import `in`.melo.ui.theme.liquidGlass
 import `in`.melo.presentation.components.SmartImage
 import `in`.melo.presentation.viewmodel.PlayerViewModel
 
@@ -135,9 +136,12 @@ private const val QUICK_PICK_ROWS = 4
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun SpotifyTile(item: Music, ui: PlayerViewModel, modifier: Modifier, onClick: () -> Unit, onLongClick: () -> Unit) {
-    val shape = RoundedCornerShape(6.dp)
+    val shape = RoundedCornerShape(if (`in`.melo.ui.theme.LocalGlassHaze.current != null) 14.dp else 6.dp)
+    val glass = `in`.melo.ui.theme.LocalGlassHaze.current != null
     Row(
-        modifier.height(56.dp).clip(shape).background(MaterialTheme.colorScheme.surfaceContainerHigh)
+        modifier.height(56.dp)
+            .then(if (glass) Modifier.liquidGlass(shape, tint = androidx.compose.ui.graphics.Color.White, fillAlpha = 0.08f)
+                else Modifier.clip(shape).background(MaterialTheme.colorScheme.surfaceContainerHigh))
             .combinedClickable(onClick = onClick, onLongClick = onLongClick),
         verticalAlignment = Alignment.CenterVertically,
     ) {

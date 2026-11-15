@@ -8,5 +8,7 @@ enum class SearchFilterType {
     SONGS,
     ALBUMS,
     ARTISTS,
-    PLAYLISTS
+    PLAYLISTS,
+    /** All of YouTube's videos, beyond YouTube Music's catalogue: a search of its own. */
+    VIDEOS
 }

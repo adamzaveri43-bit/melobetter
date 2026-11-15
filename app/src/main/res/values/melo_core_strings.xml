@@ -412,4 +412,13 @@
     <string name="glass_lyrics">Lyrics</string>
     <string name="glass_shuffle">Shuffle</string>
     <string name="glass_repeat">Repeat</string>
+    <string name="search_filter_videos">Videos</string>
+    <string name="music_sources_title">Music sources</string>
+    <string name="music_sources_description">What search, the library and Home show. Device files are always shown.</string>
+    <string name="music_sources_both">Spotify and YouTube Music</string>
+    <string name="music_sources_spotify">Spotify only</string>
+    <string name="music_sources_youtube">YouTube Music only</string>
+    <string name="home_spotify_made_for_you">Made for you</string>
+    <string name="home_spotify_popular">Popular on Spotify</string>
+    <string name="home_spotify_moods">Moods and moments</string>
 </resources>

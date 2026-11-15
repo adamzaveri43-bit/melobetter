@@ -103,6 +103,8 @@ import `in`.melo.presentation.navigation.navigateToTopLevelSafely
 import `in`.melo.presentation.navigation.openMusic
 import `in`.melo.presentation.viewmodel.PlayerViewModel
 import sh.calvin.reorderable.ReorderableColumn
+import dev.chrisbanes.haze.hazeSource
+import `in`.melo.ui.theme.liquidGlass
 
 private const val COLLAGE_ITEMS = 6
 private const val COLLAGE_MINIMUM = 3
@@ -150,25 +152,31 @@ fun HomeScreen(model: MeloModel, navController: NavHostController, paddingValues
     }
     val openLibrary: () -> Unit = { navController.navigateToTopLevelSafely(Screen.Library.route) }
 
+    // Liquid Glass: an ambient wash of colour behind the page, the list blurred through the top bar.
+    val glass = `in`.melo.ui.theme.LocalGlassHaze.current != null
+    val homeHaze = dev.chrisbanes.haze.rememberHazeState()
     Box(Modifier.fillMaxSize()) {
+        if (glass) GlassAmbientBackground()
         Scaffold(
             modifier = Modifier.fillMaxSize(),
+            containerColor = if (glass) Color.Transparent else MaterialTheme.colorScheme.background,
             topBar = {
                 HomeGradientTopBar(
                     onSettingsClick = { navController.navigateSafely(Screen.Settings.route) },
                     onHistoryClick = { navController.navigateSafely(Screen.History.route) },
                     isScrolled = isScrolled,
+                    glassHaze = homeHaze.takeIf { glass },
                 )
             }
         ) { innerPadding ->
             PullToRefreshBox(
                 isRefreshing = library.loading && content != null,
                 onRefresh = model::refreshLibrary,
-                modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background),
+                modifier = Modifier.fillMaxSize().background(if (glass) Color.Transparent else MaterialTheme.colorScheme.background),
             ) {
                 LazyColumn(
                     state = listState,
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier.fillMaxSize().then(if (glass) Modifier.hazeSource(homeHaze) else Modifier),
                     contentPadding = PaddingValues(
                         top = innerPadding.calculateTopPadding(),
                         bottom = paddingValues.calculateBottomPadding() + 38.dp + if (hasSong) MiniPlayerHeight else 0.dp
@@ -176,10 +184,7 @@ fun HomeScreen(model: MeloModel, navController: NavHostController, paddingValues
                     verticalArrangement = Arrangement.spacedBy(MeloLayout.SectionGap)
                 ) {
                     item(key = "melo_identity") {
-                        ListeningHomeHeader(
-                            onSearch = { navController.navigateToTopLevelSafely(Screen.Search.route) },
-                            onLibrary = openLibrary,
-                        )
+                        ListeningHomeHeader()
                     }
                     if (content == null && library.loading && feed.isEmpty()) {
                         item(key = "library_loading") {
@@ -211,6 +216,9 @@ fun HomeScreen(model: MeloModel, navController: NavHostController, paddingValues
                             )
                         }
                     }
+                    // Settings → Music sources: only what the allowed services hold (device files always).
+                    val sourceMode = settings.musicSources
+                    fun List<Music>.allowed() = filter { `in`.melo.data.preferences.MusicSources.allows(sourceMode, it.id) }
                     // Shelves in the order, layout and size chosen in Settings → Home.
                     settings.homeLayout.filter { it.visible }.forEach { config ->
                         val openTab: (`in`.melo.data.model.LibraryTabId) -> () -> Unit = { tab -> { ui.requestedLibraryTab.value = tab.storageKey; openLibrary() } }
@@ -221,20 +229,22 @@ fun HomeScreen(model: MeloModel, navController: NavHostController, paddingValues
                             else -> shelfTitles[config.shelf].orEmpty()
                         }
                         val (items, openAll) = when (config.shelf) {
-                            HomeShelf.PINS -> pins to null
-                            HomeShelf.RECENT -> recent to null
-                            HomeShelf.DOWNLOADS -> downloads.values.filter { it.isComplete }.map { it.collection.item } to openTab(`in`.melo.data.model.LibraryTabId.DOWNLOADS)
+                            HomeShelf.PINS -> pins.allowed() to null
+                            HomeShelf.RECENT -> recent.allowed() to null
+                            HomeShelf.DOWNLOADS -> downloads.values.filter { it.isComplete }.map { it.collection.item }.allowed() to openTab(`in`.melo.data.model.LibraryTabId.DOWNLOADS)
                             HomeShelf.LIKED, HomeShelf.FEED -> emptyList<Music>() to null
-                            HomeShelf.ALBUMS -> content?.albums.orEmpty() to openTab(`in`.melo.data.model.LibraryTabId.ALBUMS)
-                            HomeShelf.ARTISTS -> content?.artists.orEmpty() to openTab(`in`.melo.data.model.LibraryTabId.ARTISTS)
+                            HomeShelf.ALBUMS -> content?.albums.orEmpty().allowed() to openTab(`in`.melo.data.model.LibraryTabId.ALBUMS)
+                            HomeShelf.ARTISTS -> content?.artists.orEmpty().allowed() to openTab(`in`.melo.data.model.LibraryTabId.ARTISTS)
                             HomeShelf.LOCAL_FILES -> localFiles to openTab(`in`.melo.data.model.LibraryTabId.LOCAL)
                         }
                         when {
                             config.shelf == HomeShelf.FEED -> {
                                 if (feed.isEmpty() && feedLoading) item(key = "feed_loading") { ListeningShelfPlaceholder() }
-                                feed.forEach { shelf -> feedShelf(shelf, config.style, config.count, config.showTitle, ui, open, showOptions) }
+                                feed.map { it.copy(items = it.items.allowed()) }.filter { it.items.isNotEmpty() }
+                                    .forEach { shelf -> feedShelf(shelf, config.style, config.count, config.showTitle, ui, open, showOptions) }
                             }
-                            config.shelf == HomeShelf.LIKED -> if (content != null && content.savedTrackCount > 0) item(key = "liked", contentType = "liked") {
+                            config.shelf == HomeShelf.LIKED -> if (content != null && content.savedTrackCount > 0 &&
+                                `in`.melo.data.preferences.MusicSources.allowsSpotify(sourceMode)) item(key = "liked", contentType = "liked") {
                                 LikedSongsCard(
                                     count = content.savedTrackCount,
                                     artworks = content.savedTracks.mapNotNull(Music::imageUrl).distinct().take(3),
@@ -248,9 +258,9 @@ fun HomeScreen(model: MeloModel, navController: NavHostController, paddingValues
                                     },
                                 )
                             }
-                            config.shelf == HomeShelf.PINS && config.style == ShelfStyle.COLLAGE -> if (pins.isNotEmpty()) {
+                            config.shelf == HomeShelf.PINS && config.style == ShelfStyle.COLLAGE -> if (items.isNotEmpty()) {
                                 item(key = "pins_collage", contentType = "pins_collage") {
-                                    PinsCollage(pins.take(config.count), settings.collagePattern, settings.collageAutoRotate, ui, { open(it) }, { showOptions(it) }, { reordering = true })
+                                    PinsCollage(items.take(config.count), settings.collagePattern, settings.collageAutoRotate, ui, { open(it) }, { showOptions(it) }, { reordering = true })
                                 }
                             }
                             else -> homeShelf(config.shelf.key, title.takeIf { config.showTitle }, items.take(config.count), config.style, ui,
@@ -285,6 +295,25 @@ fun HomeScreen(model: MeloModel, navController: NavHostController, paddingValues
 
     if (reordering) PinsReorderSheet(pins, ui, model, onDismiss = { reordering = false })
     MusicOptionsHost(ui, navController, optionsFor) { optionsFor = null }
+}
+
+/**
+ * Soft fields of the theme's colours behind the home page in the Liquid Glass style, so the glass
+ * surfaces over it have colour to refract, as iOS draws its glass over a wallpaper.
+ */
+@Composable
+private fun GlassAmbientBackground() {
+    val scheme = MaterialTheme.colorScheme
+    androidx.compose.foundation.Canvas(Modifier.fillMaxSize().background(scheme.background)) {
+        val radius = size.maxDimension * 0.7f
+        listOf(
+            androidx.compose.ui.geometry.Offset(size.width * 0.1f, size.height * 0.08f) to scheme.primary,
+            androidx.compose.ui.geometry.Offset(size.width * 0.95f, size.height * 0.4f) to scheme.tertiary,
+            androidx.compose.ui.geometry.Offset(size.width * 0.2f, size.height * 0.85f) to scheme.secondary,
+        ).forEach { (center, color) ->
+            drawCircle(Brush.radialGradient(listOf(color.copy(alpha = 0.32f), Color.Transparent), center, radius), radius, center)
+        }
+    }
 }
 
 @Composable
@@ -437,13 +466,14 @@ private fun PinnedPill(
     val title = MaterialTheme.colorScheme.onSurface
     val shape = RoundedCornerShape(12.dp)
     val artPadding = (PinPillHeight - PinPillArtSize) / 2
+    val glass = `in`.melo.ui.theme.LocalGlassHaze.current != null
     Card(
         shape = shape,
-        colors = CardDefaults.cardColors(containerColor = container),
+        colors = CardDefaults.cardColors(containerColor = if (glass) Color.Transparent else container),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
         modifier = modifier
             .height(PinPillHeight)
-            .clip(shape)
+            .then(if (glass) Modifier.liquidGlass(shape, tint = Color.White, fillAlpha = 0.08f) else Modifier.clip(shape))
             .combinedClickable(onClick = onClick, onLongClick = onLongClick)
     ) {
         Row(

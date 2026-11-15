@@ -104,6 +104,8 @@ dependencies {
     implementation("androidx.media3:media3-datasource:1.11.1")
     implementation("androidx.media3:media3-datasource-okhttp:1.11.1")
     implementation("io.coil-kt:coil-compose:2.7.0")
+    // Liquid Glass: real background blur behind the navigation bar, mini player and top bars.
+    implementation("dev.chrisbanes.haze:haze:1.7.2")
     // UI building blocks.
     implementation("androidx.navigation:navigation-compose:2.9.8")
     implementation("androidx.compose.ui:ui-text-google-fonts:1.10.6")

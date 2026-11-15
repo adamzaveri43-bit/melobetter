@@ -39,3 +39,26 @@ object LyricsTextSize {
     val ALL = listOf(SMALL, MEDIUM, LARGE, HUGE)
     fun scale(key: String): Float = when (key) { SMALL -> 0.85f; LARGE -> 1.25f; HUGE -> 1.5f; else -> 1f }
 }
+
+/**
+ * Which services the app reads from: search, the library and the home screen show only what they
+ * allow. Device files and Melo's own playlists are always shown. A Spotify track found while only
+ * YouTube Music is allowed is never shown, so it never needs to be played through YouTube Music.
+ */
+object MusicSources {
+    const val BOTH = "both"
+    const val SPOTIFY = "spotify"
+    const val YOUTUBE = "youtube"
+    val ALL = listOf(BOTH, SPOTIFY, YOUTUBE)
+
+    fun allowsSpotify(mode: String) = mode != YOUTUBE
+    fun allowsYouTube(mode: String) = mode != SPOTIFY
+
+    /** Whether an item of any kind (track, album, artist, playlist) comes from a service [mode] allows. */
+    fun allows(mode: String, id: String): Boolean = when {
+        mode == BOTH -> true
+        id.startsWith("ytm:") -> allowsYouTube(mode)
+        id.startsWith("local:") || id.startsWith(`in`.melo.data.LOCAL_PLAYLIST_PREFIX) -> true
+        else -> allowsSpotify(mode)
+    }
+}

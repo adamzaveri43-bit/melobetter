@@ -588,7 +588,8 @@ fun UnifiedPlayerSheetV2(
                             // Liquid Glass: the mini player is a translucent pane over the page; the
                             // expanded Apple Music layout is opaque and covers it.
                             .then(
-                                if (glassUi) Modifier.liquidGlass(sheetInteractionState.playerShadowShape, tint = playerAreaBackground, fillAlpha = 0.62f)
+                                if (glassUi) Modifier.liquidGlass(sheetInteractionState.playerShadowShape, tint = playerAreaBackground,
+                                    fillAlpha = 0.5f, haze = `in`.melo.ui.theme.LocalGlassHaze.current)
                                 else Modifier.background(color = playerAreaBackground, shape = sheetInteractionState.playerShadowShape)
                             )
                             .clip(sheetInteractionState.playerShadowShape)

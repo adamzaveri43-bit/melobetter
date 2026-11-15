@@ -86,6 +86,7 @@ private fun SearchFilterType.kind(): MusicKind? = when (this) {
     SearchFilterType.ALBUMS -> MusicKind.Album
     SearchFilterType.ARTISTS -> MusicKind.Artist
     SearchFilterType.PLAYLISTS -> MusicKind.Playlist
+    SearchFilterType.VIDEOS -> null
 }
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class, ExperimentalLayoutApi::class, ExperimentalFoundationApi::class)
@@ -114,10 +115,20 @@ fun SearchScreen(
     LaunchedEffect(showSources) {
         if (!showSources && discovery.source != `in`.melo.SearchSource.All) model.setSearchSource(`in`.melo.SearchSource.All)
     }
-    val results = remember(discovery.results, filter) {
-        val kind = filter.kind()
-        discovery.results.filter { kind == null || it.kind == kind }
+    // The videos filter is a search of all of YouTube, run when it is chosen or the text changes.
+    val videoSearch by model.videoSearch.collectAsStateWithLifecycle()
+    LaunchedEffect(filter, discovery.query) {
+        if (filter == SearchFilterType.VIDEOS) model.searchVideos(discovery.query)
     }
+    val results = remember(discovery.results, filter, videoSearch.results) {
+        if (filter == SearchFilterType.VIDEOS) videoSearch.results
+        else {
+            val kind = filter.kind()
+            discovery.results.filter { kind == null || it.kind == kind }
+        }
+    }
+    val searchLoading = if (filter == SearchFilterType.VIDEOS) videoSearch.loading else discovery.loading
+    val searchError = if (filter == SearchFilterType.VIDEOS) videoSearch.error else discovery.error
     val songs = remember(results, saved) { results.filter { it.kind == MusicKind.Track }.map { it.toSong(it.id in saved) } }
     val listState = rememberLazyListState()
     val open: (Music) -> Unit = {
@@ -134,10 +145,14 @@ fun SearchScreen(
         // The long-click handler of the card already vibrates.
         optionsFor = it
     }
-    LaunchedEffect(listState, results.size, discovery.hasMore) {
+    LaunchedEffect(listState, results.size, discovery.hasMore, filter, videoSearch.next) {
         snapshotFlow { listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0 }
             .distinctUntilChanged()
-            .collect { last -> if (discovery.hasMore && last >= listState.layoutInfo.totalItemsCount - 6) model.searchNext() }
+            .collect { last ->
+                val nearEnd = last >= listState.layoutInfo.totalItemsCount - 6
+                if (filter == SearchFilterType.VIDEOS) { if (videoSearch.next != null && nearEnd) model.searchVideosNext() }
+                else if (discovery.hasMore && nearEnd) model.searchNext()
+            }
     }
 
     Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
@@ -277,12 +292,12 @@ fun SearchScreen(
                     }
                     Box(Modifier.fillMaxSize()) {
                         when {
-                            discovery.error != null && results.isEmpty() -> Text(
-                                discovery.error.orEmpty(),
+                            searchError != null && results.isEmpty() -> Text(
+                                searchError,
                                 Modifier.padding(24.dp),
                                 color = MaterialTheme.colorScheme.error,
                             )
-                            results.isEmpty() && discovery.loading -> Box(Modifier.fillMaxSize().padding(top = 48.dp), contentAlignment = Alignment.TopCenter) {
+                            results.isEmpty() && searchLoading -> Box(Modifier.fillMaxSize().padding(top = 48.dp), contentAlignment = Alignment.TopCenter) {
                                 ContainedLoadingIndicator()
                             }
                             results.isEmpty() -> EmptySearchResults(searchQuery = searchQuery, colorScheme = colorScheme)

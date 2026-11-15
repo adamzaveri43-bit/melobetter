@@ -60,6 +60,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.sync.withPermit
 import java.io.IOException
 import java.util.Locale
 import java.util.UUID
@@ -84,6 +85,15 @@ data class Discovery(
     val activeSource: SearchSource get() = if (!spotifyEnabled && source == SearchSource.Spotify) SearchSource.All else source
     val hasMore: Boolean get() = nextPage != null || youTubeNext != null
 }
+
+/** Results of the videos filter: a search of all of YouTube, separate from the mixed search. */
+data class VideoSearchUi(
+    val query: String = "",
+    val loading: Boolean = false,
+    val results: List<Music> = emptyList(),
+    val next: String? = null,
+    val error: String? = null,
+)
 
 data class AccountUi(
     val working: Boolean = false,
@@ -316,11 +326,47 @@ class MeloModel(private val app: Application) : AndroidViewModel(app) {
                 "charts" to app.getString(`in`.melo.R.string.home_charts),
             ))
         }
+        val curated = async { runCatching { spotifyCurated() }.getOrDefault(emptyList()) }
         val made = radios.mapNotNull { it.await() }
-        // Quick picks first, YouTube Music's home next, the other radios between it and the public pages.
-        (made.take(1) + home.await() + made.drop(1) + discover.await())
+        val spotify = curated.await()
+        val madeForYou = spotify.filter { it.key == SPOTIFY_MADE_FOR_YOU }
+        // Quick picks and Spotify's mixes for the account first, YouTube Music's home next, the other
+        // radios, Spotify's editorial playlists, then the public pages.
+        (made.take(1) + madeForYou + home.await() + made.drop(1) + (spotify - madeForYou.toSet()) + discover.await())
             .filter { it.items.isNotEmpty() }
             .distinctBy { it.title.lowercase(Locale.ROOT).ifBlank { it.key } }
+    }
+
+    /**
+     * Spotify's own playlists, as its home shows them: the account's mixes (Daily Mix, Discover
+     * Weekly, Release Radar…), popular editorial playlists, and playlists for moods and moments.
+     * Their IDs differ by account and change rarely: each is found once a day through the account's
+     * search, as the first playlist of that name owned by Spotify, and kept between starts.
+     */
+    private suspend fun spotifyCurated(): List<`in`.melo.data.youtube.FeedShelf> {
+        val source = remote ?: return emptyList()
+        val cached = decodeFeed(preferences.getString(KEY_SPOTIFY_CURATED, null))
+        if (cached.isNotEmpty() && System.currentTimeMillis() - preferences.getLong(KEY_SPOTIFY_CURATED_AT, 0) < SPOTIFY_CURATED_LIFETIME_MS) return cached
+        val locale = app.resources.configuration.locales.get(0) ?: Locale.getDefault()
+        val permits = kotlinx.coroutines.sync.Semaphore(3)
+        suspend fun find(name: String, exact: Boolean): Music? = permits.withPermit {
+            runCatching {
+                source.search(name, locale, null).items.filter { it.kind == MusicKind.Playlist && it.subtitle.equals("Spotify", ignoreCase = true) }
+                    .firstOrNull { if (exact) it.title.equals(name, ignoreCase = true) else it.title.contains(name, ignoreCase = true) }
+            }.getOrNull()
+        }
+        suspend fun shelf(key: String, title: Int, names: List<String>, exact: Boolean) = kotlinx.coroutines.coroutineScope {
+            val found = names.map { name -> async { find(name, exact) } }.mapNotNull { it.await() }.distinctBy(Music::id)
+            `in`.melo.data.youtube.FeedShelf(key, app.getString(title), found).takeIf { found.isNotEmpty() }
+        }
+        val shelves = listOfNotNull(
+            shelf(SPOTIFY_MADE_FOR_YOU, `in`.melo.R.string.home_spotify_made_for_you, MADE_FOR_YOU, exact = true),
+            shelf("spotify_popular", `in`.melo.R.string.home_spotify_popular, POPULAR_PLAYLISTS, exact = false),
+            shelf("spotify_moods", `in`.melo.R.string.home_spotify_moods, MOOD_PLAYLISTS, exact = false),
+        )
+        if (shelves.isEmpty()) return cached
+        preferences.edit { putString(KEY_SPOTIFY_CURATED, encodeFeed(shelves)); putLong(KEY_SPOTIFY_CURATED_AT, System.currentTimeMillis()) }
+        return shelves
     }
 
     private fun encodeFeed(shelves: List<`in`.melo.data.youtube.FeedShelf>): String = org.json.JSONArray().apply {
@@ -1158,6 +1204,45 @@ class MeloModel(private val app: Application) : AndroidViewModel(app) {
         loadResults(trimmed, debounce)
     }
 
+    private val mutableVideoSearch = MutableStateFlow(VideoSearchUi())
+    val videoSearch = mutableVideoSearch.asStateFlow()
+    private var videoJob: Job? = null
+
+    /** Searches all of YouTube's videos for [query]; the same query already searched is not asked again. */
+    fun searchVideos(query: String) {
+        val trimmed = query.trim()
+        if (trimmed == mutableVideoSearch.value.query && (mutableVideoSearch.value.loading || mutableVideoSearch.value.results.isNotEmpty())) return
+        videoJob?.cancel()
+        mutableVideoSearch.value = VideoSearchUi(query = trimmed, loading = trimmed.length >= 2)
+        if (trimmed.length < 2) return
+        videoJob = viewModelScope.launch {
+            delay(SEARCH_DEBOUNCE_MS)
+            try {
+                val page = withContext(Dispatchers.IO) { `in`.melo.data.youtube.YouTubeVideos.search(trimmed) }
+                page.tracks.forEach { ui.register(it) }
+                mutableVideoSearch.value = VideoSearchUi(trimmed, false, page.tracks, page.next)
+            } catch (cancelled: CancellationException) { throw cancelled }
+            catch (failure: Exception) {
+                mutableVideoSearch.value = VideoSearchUi(trimmed, false, error = app.getString(`in`.melo.R.string.youtube_search_failed))
+            }
+        }
+    }
+
+    /** The next page of video results, added after those shown. */
+    fun searchVideosNext() {
+        val state = mutableVideoSearch.value
+        val token = state.next ?: return
+        if (state.loading) return
+        mutableVideoSearch.value = state.copy(loading = true)
+        videoJob = viewModelScope.launch {
+            val page = runCatching { withContext(Dispatchers.IO) { `in`.melo.data.youtube.YouTubeVideos.more(token) } }.getOrNull()
+            page?.tracks?.forEach { ui.register(it) }
+            mutableVideoSearch.value = mutableVideoSearch.value.copy(loading = false,
+                results = (mutableVideoSearch.value.results + page?.tracks.orEmpty()).distinctBy(Music::id),
+                next = page?.next?.takeUnless { it == token })
+        }
+    }
+
     fun setSearchSource(source: SearchSource) {
         if (discovery.value.source == source) return
         mutableDiscovery.update { it.copy(source = source) }
@@ -1177,8 +1262,10 @@ class MeloModel(private val app: Application) : AndroidViewModel(app) {
         searchJob = viewModelScope.launch {
             if (debounce) delay(SEARCH_DEBOUNCE_MS)
             val started = android.os.SystemClock.elapsedRealtime()
-            val spotify = remote.takeIf { choice == SearchSource.All || choice == SearchSource.Spotify }
-            val withYouTube = choice == SearchSource.All || choice == SearchSource.YouTubeMusic
+            // Settings → Music sources narrows every choice to the services it allows.
+            val mode = ui.settings.value.musicSources
+            val spotify = remote.takeIf { (choice == SearchSource.All || choice == SearchSource.Spotify) && `in`.melo.data.preferences.MusicSources.allowsSpotify(mode) }
+            val withYouTube = (choice == SearchSource.All || choice == SearchSource.YouTubeMusic) && `in`.melo.data.preferences.MusicSources.allowsYouTube(mode)
             val locale = app.resources.configuration.locales.get(0) ?: Locale.getDefault()
             var spotifyItems: List<Music>? = null
             var youTubeMixed: List<Music>? = null
@@ -1421,6 +1508,8 @@ class MeloModel(private val app: Application) : AndroidViewModel(app) {
         catalog = null; collections = null; radio = null; lyrics = null
         mutableDetails.value = emptyMap()
         savedIds.value = emptySet(); mutableRecent.value = emptyList()
+        // The account's own mixes go with it.
+        preferences.edit { remove(KEY_SPOTIFY_CURATED); remove(KEY_SPOTIFY_CURATED_AT) }
         if (mutableGuest.value) installLibrary(emptyLibrary(), false) else mutableLibrary.value = LibraryUi()
         mutableAccount.value = AccountUi()
         mutableDiscovery.update { it.copy(spotifyEnabled = false) }
@@ -1668,6 +1757,16 @@ class MeloModel(private val app: Application) : AndroidViewModel(app) {
         private const val KEY_PENDING_UNLIKES = "pending_unlikes"
         private const val KEY_YOUTUBE_PLAYLISTS = "youtube_playlists"
         private const val KEY_FEED = "home_feed"
+        private const val KEY_SPOTIFY_CURATED = "spotify_curated"
+        private const val KEY_SPOTIFY_CURATED_AT = "spotify_curated_at"
+        private const val SPOTIFY_CURATED_LIFETIME_MS = 24 * 60 * 60_000L
+        private const val SPOTIFY_MADE_FOR_YOU = "spotify_made_for_you"
+        private val MADE_FOR_YOU = listOf("Daily Mix 1", "Daily Mix 2", "Daily Mix 3", "Daily Mix 4", "Daily Mix 5", "Daily Mix 6",
+            "Discover Weekly", "Release Radar", "On Repeat", "Repeat Rewind")
+        private val POPULAR_PLAYLISTS = listOf("Today's Top Hits", "Top 50 - Global", "RapCaviar", "Viral 50 - Global", "Hot Hits",
+            "Viva Latino", "Rock Classics", "All Out 2010s", "Hot Country", "Are & Be")
+        private val MOOD_PLAYLISTS = listOf("Chill Hits", "Mood Booster", "Peaceful Piano", "Deep Focus", "Beast Mode",
+            "lofi beats", "Songs to Sing in the Car", "Sleep")
         private const val RECENT_LIMIT = 30
         private const val FEED_LIFETIME_MS = 30 * 60_000L
         private const val FEED_SEEDS = 3

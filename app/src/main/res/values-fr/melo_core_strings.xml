@@ -412,4 +412,13 @@
     <string name="glass_lyrics">Paroles</string>
     <string name="glass_shuffle">Lecture aléatoire</string>
     <string name="glass_repeat">Répéter</string>
+    <string name="search_filter_videos">Vidéos</string>
+    <string name="music_sources_title">Sources musicales</string>
+    <string name="music_sources_description">Ce que montrent la recherche, la bibliothèque et l’accueil. Les fichiers de l’appareil sont toujours affichés.</string>
+    <string name="music_sources_both">Spotify et YouTube Music</string>
+    <string name="music_sources_spotify">Spotify uniquement</string>
+    <string name="music_sources_youtube">YouTube Music uniquement</string>
+    <string name="home_spotify_made_for_you">Conçu pour vous</string>
+    <string name="home_spotify_popular">Populaire sur Spotify</string>
+    <string name="home_spotify_moods">Ambiances et moments</string>
 </resources>

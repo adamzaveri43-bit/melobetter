@@ -69,20 +69,10 @@ fun MeloWordmark(modifier: Modifier = Modifier) {
 
 @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
-fun ListeningHomeHeader(onSearch: () -> Unit, onLibrary: () -> Unit) {
-    Column(Modifier.fillMaxWidth().padding(horizontal = `in`.melo.ui.theme.MeloLayout.PageGutter)) {
-        Text(stringResource(R.string.melo_home_compact_title), style = MaterialTheme.typography.headlineSmall)
-        Spacer(Modifier.height(8.dp))
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(onClick = onSearch, shape = CircleShape) {
-                Icon(Icons.Rounded.Search, null, Modifier.size(18.dp))
-                Text(stringResource(R.string.melo_discover), Modifier.padding(start = 8.dp))
-            }
-            OutlinedButton(onClick = onLibrary, shape = CircleShape,
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)) {
-                Text(stringResource(R.string.nav_bar_library))
-                Icon(Icons.AutoMirrored.Rounded.ArrowForward, null, Modifier.padding(start = 8.dp).size(18.dp))
-            }
-        }
-    }
+fun ListeningHomeHeader() {
+    Text(
+        stringResource(R.string.melo_home_compact_title),
+        Modifier.fillMaxWidth().padding(horizontal = `in`.melo.ui.theme.MeloLayout.PageGutter),
+        style = MaterialTheme.typography.headlineSmall,
+    )
 }

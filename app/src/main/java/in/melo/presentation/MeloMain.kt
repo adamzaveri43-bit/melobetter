@@ -41,7 +41,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
-import androidx.compose.ui.draw.drawWithContent
+import `in`.melo.ui.theme.liquidGlass
+import dev.chrisbanes.haze.hazeSource
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.asComposeRenderEffect
 import androidx.compose.ui.graphics.graphicsLayer
@@ -180,9 +181,13 @@ fun MeloMain(model: MeloModel) {
     val rootView = LocalView.current
     LaunchedEffect(hapticsEnabled, rootView) { rootView.rootView?.isHapticFeedbackEnabled = hapticsEnabled }
     val scopedHaptics = remember(platformHaptics, hapticsEnabled) { if (hapticsEnabled) platformHaptics else NoOpHapticFeedback }
+    // Liquid Glass: the screens are the blur source of the glass bars drawn over them.
+    val glassStyle = settings.uiStyle == `in`.melo.ui.theme.UiStyle.GLASS
+    val glassHaze = dev.chrisbanes.haze.rememberHazeState()
     CompositionLocalProvider(
         LocalAppHapticsConfig provides remember(hapticsEnabled) { AppHapticsConfig(enabled = hapticsEnabled) },
         LocalHapticFeedback provides scopedHaptics,
+        `in`.melo.ui.theme.LocalGlassHaze provides glassHaze.takeIf { glassStyle },
     ) {
     Scaffold(
         modifier = Modifier.fillMaxSize(),
@@ -254,19 +259,14 @@ fun MeloMain(model: MeloModel) {
                                 clip = true
                                 shadowElevation = navBarElevationPx
                             },
-                        // Liquid Glass: the bar lets the page show through, with a sheen and a rim of light.
-                        color = if (settings.uiStyle == `in`.melo.ui.theme.UiStyle.GLASS) MaterialTheme.colorScheme.background.copy(alpha = 0.74f)
-                            else MaterialTheme.colorScheme.background
+                        // Liquid Glass: the page scrolling underneath is blurred through the bar.
+                        color = if (glassStyle) androidx.compose.ui.graphics.Color.Transparent else MaterialTheme.colorScheme.background
                     ) {
-                        if (settings.uiStyle == `in`.melo.ui.theme.UiStyle.GLASS) Box(
-                            Modifier.fillMaxSize()
-                                .background(androidx.compose.ui.graphics.Brush.verticalGradient(listOf(
-                                    androidx.compose.ui.graphics.Color.White.copy(alpha = 0.10f), androidx.compose.ui.graphics.Color.Transparent)))
-                                .drawWithContent {
-                                    drawContent()
-                                    drawLine(androidx.compose.ui.graphics.Color.White.copy(alpha = 0.35f),
-                                        androidx.compose.ui.geometry.Offset(0f, 0f), androidx.compose.ui.geometry.Offset(size.width, 0f), 1.dp.toPx())
-                                }
+                        if (glassStyle) Box(
+                            Modifier.fillMaxSize().liquidGlass(
+                                androidx.compose.ui.graphics.RectangleShape, tint = MaterialTheme.colorScheme.background,
+                                fillAlpha = 0.55f, haze = glassHaze,
+                            )
                         )
                         PlayerInternalNavigationBar(
                             navController = navController,
@@ -309,6 +309,7 @@ fun MeloMain(model: MeloModel) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
+                    .then(if (glassStyle) Modifier.hazeSource(glassHaze) else Modifier)
                     .graphicsLayer {
                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                             if (disableBlurAllOver) {

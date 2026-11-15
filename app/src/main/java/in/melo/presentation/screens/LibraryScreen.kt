@@ -158,7 +158,11 @@ fun LibraryScreen(model: MeloModel, navController: NavHostController, paddingVal
     var showSortSheet by remember { mutableStateOf(false) }
     var creatingPlaylist by remember { mutableStateOf(false) }
     val localPlaylists by model.localPlaylists.collectAsStateWithLifecycle()
-    val youTubePlaylists by model.youTubePlaylists.collectAsStateWithLifecycle()
+    val allYouTubePlaylists by model.youTubePlaylists.collectAsStateWithLifecycle()
+    // Settings → Music sources: the library shows the allowed services only.
+    val sourceMode = ui.settings.collectAsStateWithLifecycle().value.musicSources
+    val showSpotify = `in`.melo.data.preferences.MusicSources.allowsSpotify(sourceMode)
+    val youTubePlaylists = if (`in`.melo.data.preferences.MusicSources.allowsYouTube(sourceMode)) allYouTubePlaylists else emptyList()
     val youTubeLoading by model.youTubeLoading.collectAsStateWithLifecycle()
     val localTracks by model.localTracks.collectAsStateWithLifecycle()
     val localTitle = stringResource(R.string.library_tab_local)
@@ -330,10 +334,10 @@ fun LibraryScreen(model: MeloModel, navController: NavHostController, paddingVal
                                 HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { page ->
                                     val tab = libraryTabs[page]
                                     val isEmpty = when (tab) {
-                                        LibraryTabId.PLAYLISTS -> localPlaylists.isEmpty() && youTubePlaylists.isEmpty() && content.playlists.isEmpty()
-                                        LibraryTabId.LIKED -> content.savedTrackCount == 0
-                                        LibraryTabId.ALBUMS -> content.albums.isEmpty()
-                                        LibraryTabId.ARTISTS -> content.artists.isEmpty()
+                                        LibraryTabId.PLAYLISTS -> localPlaylists.isEmpty() && youTubePlaylists.isEmpty() && (!showSpotify || content.playlists.isEmpty())
+                                        LibraryTabId.LIKED -> !showSpotify || content.savedTrackCount == 0
+                                        LibraryTabId.ALBUMS -> !showSpotify || content.albums.isEmpty()
+                                        LibraryTabId.ARTISTS -> !showSpotify || content.artists.isEmpty()
                                         else -> false
                                     }
                                     if (isEmpty) {
@@ -346,7 +350,7 @@ fun LibraryScreen(model: MeloModel, navController: NavHostController, paddingVal
                                             Modifier.padding(horizontal = 24.dp, vertical = 16.dp)
                                         )
                                     } else when (tab) {
-                                        LibraryTabId.PLAYLISTS -> PlaylistsTab((localPlaylists.map { it.asMusic() } + youTubePlaylists + content.playlists).sortedFor(sortOf(LibraryTabId.PLAYLISTS)), bottomPadding, open, pin)
+                                        LibraryTabId.PLAYLISTS -> PlaylistsTab((localPlaylists.map { it.asMusic() } + youTubePlaylists + content.playlists.takeIf { showSpotify }.orEmpty()).sortedFor(sortOf(LibraryTabId.PLAYLISTS)), bottomPadding, open, pin)
                                         LibraryTabId.LIKED -> LikedTab(model, ui, navController, content, bottomPadding)
                                         LibraryTabId.ALBUMS -> AlbumsTab(content.albums.sortedFor(sortOf(LibraryTabId.ALBUMS)), albumsAsList, ui, bottomPadding, open, pin)
                                         LibraryTabId.ARTISTS -> ArtistsTab(content.artists.sortedFor(sortOf(LibraryTabId.ARTISTS)), bottomPadding, open, pin)

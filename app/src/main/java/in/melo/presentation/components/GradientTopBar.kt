@@ -1,5 +1,7 @@
 package `in`.melo.presentation.components
 
+import dev.chrisbanes.haze.hazeEffect
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.material.icons.rounded.History
 
 import androidx.compose.animation.core.animateFloatAsState
@@ -103,10 +105,13 @@ fun HomeGradientTopBar(
     onSettingsClick: () -> Unit,
     onHistoryClick: () -> Unit,
     isScrolled: Boolean = false,
+    /** Liquid Glass: the list scrolling under the bar is blurred through it. */
+    glassHaze: dev.chrisbanes.haze.HazeState? = null,
 ) {
     val colors = MaterialTheme.colorScheme
     MeloStatusBarStyle(color = colors.background)
     TopAppBar(
+        modifier = if (glassHaze == null) Modifier else Modifier.liquidGlassBar(glassHaze, colors.background),
         title = { MeloWordmark(Modifier.padding(start = 8.dp)) },
         actions = {
             IconButton(onClick = onHistoryClick, modifier = Modifier.size(48.dp)) {
@@ -117,8 +122,22 @@ fun HomeGradientTopBar(
             }
         },
         colors = topAppBarColors(
-            containerColor = colors.background,
-            scrolledContainerColor = colors.background,
+            containerColor = if (glassHaze == null) colors.background else androidx.compose.ui.graphics.Color.Transparent,
+            scrolledContainerColor = if (glassHaze == null) colors.background else androidx.compose.ui.graphics.Color.Transparent,
         ),
     )
 }
+
+/** A full-width glass bar: blur of what scrolls under it, a light tint, and a hairline of light at its lower edge. */
+private fun Modifier.liquidGlassBar(haze: dev.chrisbanes.haze.HazeState, tint: androidx.compose.ui.graphics.Color): Modifier = this
+    .hazeEffect(haze) {
+        blurRadius = 26.dp
+        backgroundColor = tint
+        tints = listOf(dev.chrisbanes.haze.HazeTint(tint.copy(alpha = 0.5f)))
+        noiseFactor = 0.06f
+    }
+    .drawWithContent {
+        drawContent()
+        drawLine(androidx.compose.ui.graphics.Color.White.copy(alpha = 0.18f),
+            androidx.compose.ui.geometry.Offset(0f, size.height), androidx.compose.ui.geometry.Offset(size.width, size.height), 1.dp.toPx())
+    }
