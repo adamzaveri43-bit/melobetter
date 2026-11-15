@@ -41,6 +41,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.shadow
+import `in`.melo.ui.theme.liquidGlass
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
@@ -360,6 +361,7 @@ fun UnifiedPlayerSheetV2(
     val hapticFeedback = LocalHapticFeedback.current
     val swipeSettings by playerViewModel.settings.collectAsStateWithLifecycle()
     val miniSwipe = swipeSettings.miniPlayerSwipe
+    val glassUi = swipeSettings.uiStyle == `in`.melo.ui.theme.UiStyle.GLASS
     val miniDismissGestureHandler = rememberMiniPlayerDismissGestureHandler(
         scope = scope,
         density = density,
@@ -583,9 +585,11 @@ fun UnifiedPlayerSheetV2(
                                 shape = sheetInteractionState.playerShadowShape,
                                 clip = false
                             )
-                            .background(
-                                color = playerAreaBackground,
-                                shape = sheetInteractionState.playerShadowShape
+                            // Liquid Glass: the mini player is a translucent pane over the page; the
+                            // expanded Apple Music layout is opaque and covers it.
+                            .then(
+                                if (glassUi) Modifier.liquidGlass(sheetInteractionState.playerShadowShape, tint = playerAreaBackground, fillAlpha = 0.62f)
+                                else Modifier.background(color = playerAreaBackground, shape = sheetInteractionState.playerShadowShape)
                             )
                             .clip(sheetInteractionState.playerShadowShape)
                             // innerLayout:

@@ -41,6 +41,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.asComposeRenderEffect
 import androidx.compose.ui.graphics.graphicsLayer
@@ -253,8 +254,20 @@ fun MeloMain(model: MeloModel) {
                                 clip = true
                                 shadowElevation = navBarElevationPx
                             },
-                        color = MaterialTheme.colorScheme.background
+                        // Liquid Glass: the bar lets the page show through, with a sheen and a rim of light.
+                        color = if (settings.uiStyle == `in`.melo.ui.theme.UiStyle.GLASS) MaterialTheme.colorScheme.background.copy(alpha = 0.74f)
+                            else MaterialTheme.colorScheme.background
                     ) {
+                        if (settings.uiStyle == `in`.melo.ui.theme.UiStyle.GLASS) Box(
+                            Modifier.fillMaxSize()
+                                .background(androidx.compose.ui.graphics.Brush.verticalGradient(listOf(
+                                    androidx.compose.ui.graphics.Color.White.copy(alpha = 0.10f), androidx.compose.ui.graphics.Color.Transparent)))
+                                .drawWithContent {
+                                    drawContent()
+                                    drawLine(androidx.compose.ui.graphics.Color.White.copy(alpha = 0.35f),
+                                        androidx.compose.ui.geometry.Offset(0f, 0f), androidx.compose.ui.geometry.Offset(size.width, 0f), 1.dp.toPx())
+                                }
+                        )
                         PlayerInternalNavigationBar(
                             navController = navController,
                             navItems = commonNavItems,

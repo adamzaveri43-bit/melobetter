@@ -38,13 +38,14 @@ class CustomizationTest {
             playerBackground = PlayerBackground.ANIMATED, playerArtworkSize = "medium", showPlayerCastButton = false,
             showPlayerQueueButton = false, miniArtworkShape = MiniArtworkShape.SQUARE, miniShowPrevious = false,
             miniShowNext = false, miniShowProgress = true, lyricsBackground = PlayerBackground.BLUR,
-            lyricsTextSize = LyricsTextSize.HUGE, lyricsBold = true,
+            lyricsTextSize = LyricsTextSize.HUGE, lyricsBold = true, uiStyle = `in`.melo.ui.theme.UiStyle.GLASS,
         )
         assertEquals(chosen, AppSettings.fromJson(chosen.toJson()))
-        val unknown = AppSettings.fromJson(JSONObject().put("playerBackground", "neon").put("miniArtworkShape", "star").put("lyricsTextSize", "tiny"))
+        val unknown = AppSettings.fromJson(JSONObject().put("playerBackground", "neon").put("miniArtworkShape", "star").put("lyricsTextSize", "tiny").put("uiStyle", "aero"))
         assertEquals(AppSettings().playerBackground, unknown.playerBackground)
         assertEquals(AppSettings().miniArtworkShape, unknown.miniArtworkShape)
         assertEquals(AppSettings().lyricsTextSize, unknown.lyricsTextSize)
+        assertEquals(`in`.melo.ui.theme.UiStyle.MATERIAL, unknown.uiStyle)
         // Backups made before these settings keep the previous look.
         assertEquals(AppSettings(), AppSettings.fromJson(JSONObject()))
     }

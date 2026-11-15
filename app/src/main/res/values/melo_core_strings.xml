@@ -402,4 +402,14 @@
     <string name="lyrics_blur_strength_title">Blur strength</string>
     <string name="lyrics_translation_title">Show translations</string>
     <string name="lyrics_romanization_title">Show romanization</string>
+    <string name="ui_style_title">Style</string>
+    <string name="ui_style_description">Material You, or the Apple Music player with Liquid Glass</string>
+    <string name="ui_style_material">Material You</string>
+    <string name="ui_style_glass">Apple Music + Liquid Glass</string>
+    <string name="glass_favorite">Favourite</string>
+    <string name="glass_previous">Previous</string>
+    <string name="glass_next">Next</string>
+    <string name="glass_lyrics">Lyrics</string>
+    <string name="glass_shuffle">Shuffle</string>
+    <string name="glass_repeat">Repeat</string>
 </resources>

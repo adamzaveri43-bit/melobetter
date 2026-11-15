@@ -402,4 +402,14 @@
     <string name="lyrics_blur_strength_title">Intensité du flou</string>
     <string name="lyrics_translation_title">Afficher les traductions</string>
     <string name="lyrics_romanization_title">Afficher la romanisation</string>
+    <string name="ui_style_title">Style</string>
+    <string name="ui_style_description">Material You, ou le lecteur Apple Music avec Liquid Glass</string>
+    <string name="ui_style_material">Material You</string>
+    <string name="ui_style_glass">Apple Music + Liquid Glass</string>
+    <string name="glass_favorite">Favori</string>
+    <string name="glass_previous">Précédent</string>
+    <string name="glass_next">Suivant</string>
+    <string name="glass_lyrics">Paroles</string>
+    <string name="glass_shuffle">Lecture aléatoire</string>
+    <string name="glass_repeat">Répéter</string>
 </resources>

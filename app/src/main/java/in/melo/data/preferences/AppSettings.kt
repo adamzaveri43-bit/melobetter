@@ -83,6 +83,8 @@ data class AppSettings(
     val lyricsBackground: String = PlayerBackground.SOLID,
     val lyricsTextSize: String = LyricsTextSize.MEDIUM,
     val lyricsBold: Boolean = false,
+    /** [`in`.melo.ui.theme.UiStyle]: Material You, or Apple Music's player with Liquid Glass surfaces. */
+    val uiStyle: String = `in`.melo.ui.theme.UiStyle.MATERIAL,
 ) {
     fun actions(page: DetailPage): List<ActionSlot> =
         DetailActions.decode(page, if (page == DetailPage.ALBUM) albumActions else playlistActions)
@@ -114,7 +116,7 @@ data class AppSettings(
         .put("showPlayerCastButton", showPlayerCastButton).put("showPlayerQueueButton", showPlayerQueueButton)
         .put("miniArtworkShape", miniArtworkShape).put("miniShowPrevious", miniShowPrevious).put("miniShowNext", miniShowNext)
         .put("miniShowProgress", miniShowProgress).put("lyricsBackground", lyricsBackground)
-        .put("lyricsTextSize", lyricsTextSize).put("lyricsBold", lyricsBold)
+        .put("lyricsTextSize", lyricsTextSize).put("lyricsBold", lyricsBold).put("uiStyle", uiStyle)
 
     companion object {
         const val THEME_SYSTEM = "system"
@@ -194,6 +196,7 @@ data class AppSettings(
                 lyricsBackground = json.optString("lyricsBackground", d.lyricsBackground).takeIf { it in PlayerBackground.ALL } ?: d.lyricsBackground,
                 lyricsTextSize = json.optString("lyricsTextSize", d.lyricsTextSize).takeIf { it in LyricsTextSize.ALL } ?: d.lyricsTextSize,
                 lyricsBold = json.optBoolean("lyricsBold", d.lyricsBold),
+                uiStyle = json.optString("uiStyle", d.uiStyle).takeIf { it in `in`.melo.ui.theme.UiStyle.ALL } ?: d.uiStyle,
             )
         }
     }

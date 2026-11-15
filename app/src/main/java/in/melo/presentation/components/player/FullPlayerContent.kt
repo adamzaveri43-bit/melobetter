@@ -538,6 +538,34 @@ fun FullPlayerContent(
         )
     }
 
+    // Settings → Appearance → Style: Apple Music with Liquid Glass replaces the Material layout. The
+    // sheets below (lyrics, output, song info, artists) are shared by both.
+    val glass = appSettings.uiStyle == `in`.melo.ui.theme.UiStyle.GLASS
+    if (glass) {
+        AppleMusicPlayerLayout(
+            song = song,
+            isPlayingProvider = isPlayingProvider,
+            positionProvider = currentPositionProvider,
+            durationProvider = { totalDurationProvider().takeIf { it > 0 } ?: song.duration },
+            isFavoriteProvider = isFavoriteProvider,
+            isShuffleEnabled = isShuffleEnabled,
+            repeatMode = repeatMode,
+            onCollapse = onCollapse,
+            onPlayPause = onPlayPause,
+            onNext = onNext,
+            onPrevious = onPrevious,
+            onSeek = onSeek,
+            onFavorite = onFavoriteToggle,
+            onShuffle = onShuffleToggle,
+            onRepeat = onRepeatToggle,
+            onLyrics = onLyricsClick,
+            onCast = { showOutputSheet = true },
+            onQueue = onSongMetadataQueueClick,
+            onOptions = { onShowSongOptions(song.copy(duration = totalDurationProvider().takeIf { it > 0 } ?: song.duration)) },
+            onArtist = onSongMetadataArtistClick,
+            onAlbum = { playerViewModel.openAlbumOf(song) },
+        )
+    } else {
     // Settings → Player → Background: drawn under the transparent scaffold.
     PlayerBackdrop(appSettings.playerBackground, song.albumArtUriString?.takeIf { it.isNotBlank() }, LocalMaterialTheme.current)
 
@@ -751,6 +779,7 @@ fun FullPlayerContent(
             }
         }
     }
+    } // end of the Material layout
     AnimatedVisibility(
         visible = showLyricsSheet,
         enter = slideInVertically(
@@ -781,10 +810,11 @@ fun FullPlayerContent(
                 val scale = `in`.melo.data.preferences.LyricsTextSize.scale(appSettings.lyricsTextSize)
                 base.copy(
                     fontFamily = null, fontSize = base.fontSize * scale, lineHeight = base.lineHeight * scale,
-                    fontWeight = if (appSettings.lyricsBold) FontWeight.Bold else base.fontWeight,
+                    fontWeight = if (appSettings.lyricsBold || glass) FontWeight.Bold else base.fontWeight,
                 )
             },
-            backdropStyle = appSettings.lyricsBackground,
+            backdropStyle = if (glass && appSettings.lyricsBackground == `in`.melo.data.preferences.PlayerBackground.SOLID)
+                `in`.melo.data.preferences.PlayerBackground.BLUR else appSettings.lyricsBackground,
             colorScheme = LocalMaterialTheme.current,
             onBackClick = { showLyricsSheet = false },
             initialShowSyncedLyrics = selectedLyricsMode,

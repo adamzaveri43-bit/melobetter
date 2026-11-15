@@ -259,6 +259,16 @@ private fun AppearanceSettings(model: MeloModel, navController: NavHostControlle
     SettingsScaffold(stringResource(R.string.settings_category_appearance_title), navController) {
         SettingsSection(title = stringResource(R.string.settings_global_theme_section), icon = {}) {
             ThemeSelectorItem(
+                label = stringResource(R.string.ui_style_title), description = stringResource(R.string.ui_style_description),
+                options = mapOf(
+                    `in`.melo.ui.theme.UiStyle.MATERIAL to stringResource(R.string.ui_style_material),
+                    `in`.melo.ui.theme.UiStyle.GLASS to stringResource(R.string.ui_style_glass),
+                ),
+                selectedKey = s.uiStyle,
+                onSelectionChanged = { key -> update { it.copy(uiStyle = key) } },
+                leadingIcon = { Icon(Icons.Rounded.AutoAwesome, null, tint = MaterialTheme.colorScheme.secondary) },
+            )
+            ThemeSelectorItem(
                 label = stringResource(R.string.settings_app_language_title), description = "",
                 options = mapOf(
                     AppSettings.LANGUAGE_SYSTEM to stringResource(R.string.settings_language_system),
@@ -720,6 +730,18 @@ private fun PlayerSettings(model: MeloModel, navController: NavHostController) {
     )
     fun icon(vector: ImageVector): @Composable () -> Unit = { Icon(vector, null, tint = MaterialTheme.colorScheme.secondary) }
     SettingsScaffold(stringResource(R.string.settings_player_title), navController) {
+        SettingsSection(title = stringResource(R.string.ui_style_title), icon = {}) {
+            ThemeSelectorItem(
+                label = stringResource(R.string.ui_style_title), description = stringResource(R.string.ui_style_description),
+                options = mapOf(
+                    `in`.melo.ui.theme.UiStyle.MATERIAL to stringResource(R.string.ui_style_material),
+                    `in`.melo.ui.theme.UiStyle.GLASS to stringResource(R.string.ui_style_glass),
+                ),
+                selectedKey = s.uiStyle,
+                onSelectionChanged = { key -> update { it.copy(uiStyle = key) } },
+                leadingIcon = { Icon(Icons.Rounded.AutoAwesome, null, tint = MaterialTheme.colorScheme.secondary) },
+            )
+        }
         SettingsSection(title = stringResource(R.string.settings_now_playing_section), icon = {}) {
             ThemeSelectorItem(stringResource(R.string.player_background_title), "", backgrounds, s.playerBackground,
                 { key -> update { it.copy(playerBackground = key) } }, icon(Icons.Rounded.Wallpaper))
