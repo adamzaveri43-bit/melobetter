@@ -869,14 +869,20 @@ private fun FullPlayerAlbumCoverSection(
             .fillMaxWidth()
             .padding(vertical = 8.dp)
     ) {
-        val artworkWidth = maxWidth * artworkFraction
-        val carouselHeight = when (carouselStyle) {
-            CarouselStyle.NO_PEEK -> artworkWidth
-            CarouselStyle.ONE_PEEK -> artworkWidth * 0.8f
-            CarouselStyle.TWO_PEEK -> artworkWidth * 0.6f
-            else -> artworkWidth * 0.8f
+        // A queue of one song has nothing to peek at: the carousel shows it alone, at full width.
+        val effectiveStyle = if (currentPlaybackQueue.size <= 1) CarouselStyle.NO_PEEK else carouselStyle
+        // Share of the carousel's width the focused cover takes; the carousel is as tall as that cover,
+        // so the cover is always a square.
+        val focalShare = when (effectiveStyle) {
+            CarouselStyle.NO_PEEK -> 1f
+            CarouselStyle.TWO_PEEK -> 0.6f
+            else -> 0.8f
         }
-        val artworkInset = (maxWidth - artworkWidth) / 2
+        // On a short screen the square shrinks to the height left, instead of being cropped.
+        val heightLimit = if (constraints.hasBoundedHeight) maxHeight else Dp.Infinity
+        val artworkWidth = minOf(maxWidth * artworkFraction, heightLimit / focalShare)
+        val carouselHeight = artworkWidth * focalShare
+        val artworkInset = ((maxWidth - artworkWidth) / 2).coerceAtLeast(0.dp)
 
         DelayedContent(
             shouldDelay = shouldDelay,
@@ -926,7 +932,7 @@ private fun FullPlayerAlbumCoverSection(
                     }
                 },
                 onAlbumClick = onAlbumClick,
-                carouselStyle = carouselStyle,
+                carouselStyle = effectiveStyle,
                 modifier = Modifier
                     .padding(horizontal = artworkInset)
                     .height(carouselHeight)
@@ -1192,7 +1198,8 @@ private fun FullPlayerPortraitContent(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.SpaceAround
     ) {
-        albumCoverSection(Modifier)
+        // Measured after the text and controls: the cover is the largest square that fits what they leave.
+        albumCoverSection(Modifier.weight(1f, fill = false))
 
         Column(
             modifier = Modifier.fillMaxWidth(),
