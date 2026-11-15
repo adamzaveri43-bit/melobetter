@@ -4,6 +4,7 @@ import `in`.melo.data.ArtistProfile
 import `in`.melo.data.CatalogDetail
 import `in`.melo.data.Music
 import `in`.melo.data.MusicKind
+import `in`.melo.data.distinctReleases
 import org.json.JSONArray
 import org.json.JSONObject
 import java.util.concurrent.ConcurrentHashMap
@@ -158,10 +159,13 @@ object YouTubePages {
                 }
             }
         }
-        val releases = (albums + singles).distinctBy(Music::id)
+        // YouTube Music lists the explicit and clean versions of a release as two albums.
+        val dedupedAlbums = albums.distinctReleases()
+        val dedupedSingles = singles.distinctReleases().filter { single -> dedupedAlbums.none { it.id == single.id } }
+        val releases = (dedupedAlbums + dedupedSingles).distinctBy(Music::id)
         val profile = ArtistProfile(
             monthlyListeners = audience?.let(::abbreviatedCount), approximate = true,
-            playCounts = plays, albums = albums.map(Music::id), singles = singles.map(Music::id),
+            playCounts = plays, albums = dedupedAlbums.map(Music::id), singles = dedupedSingles.map(Music::id),
             biography = description,
         )
         return CatalogDetail(artist, songs, releases + similar.distinctBy(Music::id), artist = profile)

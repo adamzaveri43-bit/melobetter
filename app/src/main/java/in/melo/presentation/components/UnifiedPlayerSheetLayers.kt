@@ -71,6 +71,7 @@ internal fun BoxScope.UnifiedPlayerMiniAndFullLayers(
     onQueueDrag: (Float) -> Unit,
     onQueueRelease: (Float, Float) -> Unit
 ) {
+    val miniSettings by playerViewModel.settings.collectAsStateWithLifecycle()
     currentSong?.let { currentSongNonNull ->
         miniPlayerScheme?.let { readyScheme ->
             CompositionLocalProvider(
@@ -128,7 +129,16 @@ internal fun BoxScope.UnifiedPlayerMiniAndFullLayers(
                         onPrevious = { playerViewModel.previousSong() },
                         onNext = { playerViewModel.nextSong() },
                         canScroll = isMiniPlayerVisible && infrequentPlayerState.isPlaying,
-                        modifier = Modifier.fillMaxSize()
+                        modifier = Modifier.fillMaxSize(),
+                        artworkShape = miniSettings.miniArtworkShape,
+                        showPrevious = miniSettings.miniShowPrevious,
+                        showNext = miniSettings.miniShowNext,
+                        progressProvider = if (!miniSettings.miniShowProgress) null else {
+                            {
+                                val total = infrequentPlayerState.totalDuration
+                                if (total > 0) currentPositionProvider().toFloat() / total else 0f
+                            }
+                        },
                     )
                 }
             }

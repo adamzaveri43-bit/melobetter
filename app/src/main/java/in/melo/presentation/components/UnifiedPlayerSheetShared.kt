@@ -39,6 +39,7 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
@@ -74,7 +75,13 @@ internal fun MiniPlayerContentInternal(
     onPrevious: () -> Unit,
     onNext: () -> Unit,
     modifier: Modifier = Modifier,
-    canScroll: Boolean = true
+    canScroll: Boolean = true,
+    /** Settings → Player → Mini player: a [`in`.melo.data.preferences.MiniArtworkShape] key and the skip buttons. */
+    artworkShape: String = `in`.melo.data.preferences.MiniArtworkShape.CIRCLE,
+    showPrevious: Boolean = true,
+    showNext: Boolean = true,
+    /** Played share of the track, 0 to 1, read while drawing; null hides the progress line. */
+    progressProvider: (() -> Float)? = null,
 ) {
     val hapticFeedback = LocalHapticFeedback.current
     val controlsEnabled = !isCastConnecting && !isPreparingPlayback
@@ -85,10 +92,30 @@ internal fun MiniPlayerContentInternal(
     val nextInteraction = remember { MutableInteractionSource() }
     val miniPlayerIndication = remember { ripple(bounded = false) }
 
+    val coverShape = when (artworkShape) {
+        `in`.melo.data.preferences.MiniArtworkShape.ROUNDED -> androidx.compose.foundation.shape.RoundedCornerShape(10.dp)
+        `in`.melo.data.preferences.MiniArtworkShape.SQUARE -> androidx.compose.foundation.shape.RoundedCornerShape(2.dp)
+        else -> CircleShape
+    }
+    val progressColor = LocalMaterialTheme.current.primary
+    val trackColor = LocalMaterialTheme.current.onPrimaryContainer.copy(alpha = 0.16f)
     Row(
         modifier = modifier
             .fillMaxWidth()
             .height(MiniPlayerHeight)
+            .then(if (progressProvider == null) Modifier else Modifier.drawWithContent {
+                drawContent()
+                // A 3 dp line along the bottom edge, inset like the content.
+                val inset = 18.dp.toPx()
+                val height = 3.dp.toPx()
+                val y = size.height - height - 2.dp.toPx()
+                val width = size.width - inset * 2
+                val radius = androidx.compose.ui.geometry.CornerRadius(height / 2)
+                drawRoundRect(trackColor, androidx.compose.ui.geometry.Offset(inset, y), androidx.compose.ui.geometry.Size(width, height), radius)
+                val played = progressProvider().coerceIn(0f, 1f)
+                if (played > 0f) drawRoundRect(progressColor, androidx.compose.ui.geometry.Offset(inset, y),
+                    androidx.compose.ui.geometry.Size(width * played, height), radius)
+            })
             .padding(start = 10.dp, end = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -98,7 +125,7 @@ internal fun MiniPlayerContentInternal(
                 SmartImage(
                     model = albumArtModel,
                     contentDescription = "Cover of ${song.title}",
-                    shape = CircleShape,
+                    shape = coverShape,
                     targetSize = Size(150, 150),
                     modifier = Modifier.size(44.dp),
                     placeholderModel = if (albumArtModel?.startsWith("telegram_art") == true) {
@@ -150,9 +177,9 @@ internal fun MiniPlayerContentInternal(
                 canScroll = canScroll
             )
         }
-        Spacer(modifier = Modifier.width(8.dp))
+        if (showPrevious) Spacer(modifier = Modifier.width(8.dp))
 
-        Box(
+        if (showPrevious) Box(
             modifier = Modifier
                 .size(36.dp)
                 .clip(CircleShape)
@@ -207,9 +234,9 @@ internal fun MiniPlayerContentInternal(
             }
         }
 
-        Spacer(modifier = Modifier.width(8.dp))
+        if (showNext) Spacer(modifier = Modifier.width(8.dp))
 
-        Box(
+        if (showNext) Box(
             modifier = Modifier
                 .size(36.dp)
                 .clip(CircleShape)

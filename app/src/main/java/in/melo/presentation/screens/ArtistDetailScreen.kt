@@ -84,6 +84,7 @@ import androidx.navigation.NavHostController
 import `in`.melo.MeloModel
 import `in`.melo.data.Music
 import `in`.melo.data.MusicKind
+import `in`.melo.data.distinctReleases
 import `in`.melo.data.model.toAlbum
 import `in`.melo.data.model.toArtist
 import `in`.melo.data.model.toSong
@@ -262,7 +263,7 @@ fun ArtistDetailScreen(
             // Release groups as the official page shows them; pages stored before profiles keep one list.
             val albumsById = remember(albums) { albums.associateBy(Music::id) }
             val sections = remember(profile, albums) {
-                if (profile == null) listOf(R.string.albums to albums)
+                if (profile == null) listOf(R.string.albums to albums.distinctReleases())
                 else listOf(
                     R.string.artist_popular_releases to profile.popularReleases,
                     R.string.albums to profile.albums,
@@ -270,7 +271,7 @@ fun ArtistDetailScreen(
                     R.string.artist_compilations to profile.compilations,
                     R.string.artist_appears_on to profile.appearsOn,
                 ).map { (title, ids) -> title to ids.mapNotNull(albumsById::get) }
-            }.filter { it.second.isNotEmpty() }
+            }.map { (title, releases) -> title to releases.distinctReleases() }.filter { it.second.isNotEmpty() }
             val expanded = remember(item.id) { androidx.compose.runtime.mutableStateMapOf<Int, Boolean>() }
             val currentTopBarHeightDp = with(density) { topBarHeight.value.toDp() }
             val showScrollBar = LocalShowScrollbar.current && collapseFraction > 0.95f &&

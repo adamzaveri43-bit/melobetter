@@ -441,6 +441,7 @@ fun FullPlayerContent(
             placeholderColor = placeholderColor,
             placeholderOnColor = placeholderOnColor,
             albumArtQuality = albumArtQuality,
+            artworkFraction = `in`.melo.data.preferences.PlayerArtworkSize.fraction(appSettings.playerArtworkSize),
             requestedScrollIndex = pendingCarouselIndex,
             onSongSelected = onAlbumSongSelected,
             onAlbumClick = { albumSong -> playerViewModel.openAlbumOf(albumSong) },
@@ -536,6 +537,9 @@ fun FullPlayerContent(
             isPlayingProvider = isPlayingProvider
         )
     }
+
+    // Settings → Player → Background: drawn under the transparent scaffold.
+    PlayerBackdrop(appSettings.playerBackground, song.albumArtUriString?.takeIf { it.isNotBlank() }, LocalMaterialTheme.current)
 
     Scaffold(
         containerColor = Color.Transparent,
@@ -664,7 +668,7 @@ fun FullPlayerContent(
                             horizontalArrangement = Arrangement.spacedBy(6.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Box(
+                            if (appSettings.showPlayerCastButton) Box(
                                 modifier = Modifier
                                     .size(height = 42.dp, width = 50.dp)
                                     .clip(CircleShape)
@@ -678,7 +682,7 @@ fun FullPlayerContent(
                                     tint = playerAccentColor
                                 )
                             }
-                            Box(
+                            if (appSettings.showPlayerQueueButton) Box(
                                 modifier = Modifier
                                     .size(height = 42.dp, width = 50.dp)
                                     .clip(CircleShape)
@@ -773,7 +777,14 @@ fun FullPlayerContent(
             onDismissLyricsSearch = { playerViewModel.resetLyricsSearchState() },
             lyricsSyncOffset = lyricsSyncOffset,
             onLyricsSyncOffsetChange = { playerViewModel.setLyricsSyncOffset(song.id, it) },
-            lyricsTextStyle = MaterialTheme.typography.titleLarge.copy(fontFamily = null),
+            lyricsTextStyle = MaterialTheme.typography.titleLarge.let { base ->
+                val scale = `in`.melo.data.preferences.LyricsTextSize.scale(appSettings.lyricsTextSize)
+                base.copy(
+                    fontFamily = null, fontSize = base.fontSize * scale, lineHeight = base.lineHeight * scale,
+                    fontWeight = if (appSettings.lyricsBold) FontWeight.Bold else base.fontWeight,
+                )
+            },
+            backdropStyle = appSettings.lyricsBackground,
             colorScheme = LocalMaterialTheme.current,
             onBackClick = { showLyricsSheet = false },
             initialShowSyncedLyrics = selectedLyricsMode,
@@ -833,6 +844,8 @@ private fun FullPlayerAlbumCoverSection(
     placeholderColor: Color,
     placeholderOnColor: Color,
     albumArtQuality: AlbumArtQuality,
+    /** Share of the player's width the artwork takes (Settings → Player → Artwork size). */
+    artworkFraction: Float = 1f,
     requestedScrollIndex: Int?,
     onSongSelected: (Song, Int) -> Unit,
     onAlbumClick: (Song) -> Unit,
@@ -856,12 +869,14 @@ private fun FullPlayerAlbumCoverSection(
             .fillMaxWidth()
             .padding(vertical = 8.dp)
     ) {
+        val artworkWidth = maxWidth * artworkFraction
         val carouselHeight = when (carouselStyle) {
-            CarouselStyle.NO_PEEK -> maxWidth
-            CarouselStyle.ONE_PEEK -> maxWidth * 0.8f
-            CarouselStyle.TWO_PEEK -> maxWidth * 0.6f
-            else -> maxWidth * 0.8f
+            CarouselStyle.NO_PEEK -> artworkWidth
+            CarouselStyle.ONE_PEEK -> artworkWidth * 0.8f
+            CarouselStyle.TWO_PEEK -> artworkWidth * 0.6f
+            else -> artworkWidth * 0.8f
         }
+        val artworkInset = (maxWidth - artworkWidth) / 2
 
         DelayedContent(
             shouldDelay = shouldDelay,
@@ -913,6 +928,7 @@ private fun FullPlayerAlbumCoverSection(
                 onAlbumClick = onAlbumClick,
                 carouselStyle = carouselStyle,
                 modifier = Modifier
+                    .padding(horizontal = artworkInset)
                     .height(carouselHeight)
                     .graphicsLayer {
                         scaleX = albumArtScale

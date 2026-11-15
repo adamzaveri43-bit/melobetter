@@ -35,3 +35,15 @@ fun musicSourceOf(id: String): MusicSource = when {
         id.startsWith(`in`.melo.data.youtube.YTM_ARTIST_PREFIX) -> MusicSource.YouTubeMusic
     else -> MusicSource.Spotify
 }
+
+private val RELEASE_SEPARATORS = Regex("[^\\p{L}\\p{N}]+")
+
+/**
+ * One entry per release: versions of an album that differ only by their ID (explicit and clean,
+ * regional copies) share a title and year. Editions with their own title ("Deluxe") are kept.
+ * The first version listed is the one kept.
+ */
+fun List<Music>.distinctReleases(): List<Music> = distinctBy { release ->
+    if (release.kind != MusicKind.Album) release.id
+    else release.title.lowercase().replace(RELEASE_SEPARATORS, " ").trim() + "|" + release.note.trim()
+}

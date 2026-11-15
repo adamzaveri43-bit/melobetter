@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -29,6 +30,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.sp
 import `in`.melo.ui.theme.GoogleSansRounded
@@ -129,6 +131,58 @@ internal fun QuickPicks(items: List<Music>, ui: PlayerViewModel, onClick: (Music
 
 private const val QUICK_PICK_ROWS = 4
 
+/** A compact tile of Spotify's home grid: the cover flush with the start, the title beside it. */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun SpotifyTile(item: Music, ui: PlayerViewModel, modifier: Modifier, onClick: () -> Unit, onLongClick: () -> Unit) {
+    val shape = RoundedCornerShape(6.dp)
+    Row(
+        modifier.height(56.dp).clip(shape).background(MaterialTheme.colorScheme.surfaceContainerHigh)
+            .combinedClickable(onClick = onClick, onLongClick = onLongClick),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Cover(item, ui, MaterialTheme.colorScheme.surfaceContainerHighest, androidx.compose.ui.graphics.RectangleShape, Modifier.size(56.dp))
+        Text(
+            item.title, Modifier.weight(1f).padding(horizontal = 10.dp),
+            fontFamily = GoogleSansRounded, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, lineHeight = 16.sp,
+            color = MaterialTheme.colorScheme.onSurface, maxLines = 2, overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+/**
+ * One enlarged cover at a time: a swipe left or right moves to the next or previous item, whose
+ * covers peek, smaller and dimmer, at the sides. A tap opens or plays the centred item.
+ */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun CoverFlow(items: List<Music>, ui: PlayerViewModel, onClick: (Music) -> Unit, onLongClick: (Music) -> Unit) {
+    val pager = androidx.compose.foundation.pager.rememberPagerState { items.size }
+    val side = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp.dp * 0.17f
+    androidx.compose.foundation.pager.HorizontalPager(
+        state = pager,
+        contentPadding = PaddingValues(horizontal = side),
+        pageSpacing = 8.dp,
+        key = { items[it].id },
+    ) { page ->
+        val item = items[page]
+        val distance = kotlin.math.abs((pager.currentPage - page) + pager.currentPageOffsetFraction).coerceIn(0f, 1f)
+        Column(
+            Modifier.fillMaxWidth().graphicsLayer {
+                val scale = 1f - 0.14f * distance
+                scaleX = scale; scaleY = scale; alpha = 1f - 0.45f * distance
+            },
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            val shape = RoundedCornerShape(14.dp)
+            Box(Modifier.fillMaxWidth().aspectRatio(1f).clip(shape).combinedClickable(onClick = { onClick(item) }, onLongClick = { onLongClick(item) })) {
+                Cover(item, ui, MaterialTheme.colorScheme.surfaceContainerHighest, shape, Modifier.fillMaxSize())
+            }
+            CardTexts(item, true, Modifier.padding(top = 14.dp))
+        }
+    }
+}
+
 /** Lays out a shelf's items in the chosen [style]. Pills are drawn by the caller. */
 @Composable
 internal fun ShelfItems(
@@ -159,6 +213,22 @@ internal fun ShelfItems(
         ShelfStyle.LIST -> Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             items.forEach { item -> ShelfListRow(item, ui, { onClick(item) }, { onLongClick(item) }) }
         }
+        ShelfStyle.YOUTUBE_MUSIC -> LazyRow(contentPadding = PaddingValues(horizontal = MeloLayout.PageGutter), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+            items(items.chunked(2), key = { it.first().id }) { column ->
+                Column(Modifier.width(136.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                    column.forEach { item -> ShelfCoverCard(item, ui, Modifier.fillMaxWidth(), { onClick(item) }, { onLongClick(item) }) }
+                }
+            }
+        }
+        ShelfStyle.SPOTIFY -> Column(Modifier.padding(horizontal = MeloLayout.PageGutter), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            items.chunked(2).forEach { row ->
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    row.forEach { item -> SpotifyTile(item, ui, Modifier.weight(1f), { onClick(item) }, { onLongClick(item) }) }
+                    if (row.size == 1) Spacer(Modifier.weight(1f))
+                }
+            }
+        }
+        ShelfStyle.COVER_FLOW -> CoverFlow(items, ui, onClick, onLongClick)
         else -> Column(Modifier.padding(horizontal = MeloLayout.PageGutter), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             items.chunked(2).forEach { row ->
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

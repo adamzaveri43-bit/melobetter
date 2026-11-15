@@ -114,17 +114,23 @@ internal class SpotifyCatalog(
                 val topUris = top?.messages(2).orEmpty().mapNotNull { gidUri("track", it.bytes(1)) }
                     .ifEmpty { extras.topTracks }
                 val tracks = hydrate(topUris)
-                // Album, single, compilation and "appears on" groups, as the official page separates them. The
-                // groups only carry album IDs: their metadata is read, newest first, up to a limit per group.
-                val groupIds = (5..8).associateWith { field ->
-                    metadata.messages(field).flatMap { it.messages(1) }.mapNotNull { gidUri("album", it.bytes(1)) }.distinct()
+                // Album, single, compilation and "appears on" groups, as the official page separates them. Each
+                // entry of a group is one release whose versions (explicit and clean, regional copies) carry their
+                // own album IDs: one version is shown per release, the first the account's catalogue describes.
+                // The groups only carry album IDs: their metadata is read, newest first, up to a limit per group.
+                val groupVersions = (5..8).associateWith { field ->
+                    metadata.messages(field)
+                        .map { release -> release.messages(1).mapNotNull { gidUri("album", it.bytes(1)) }.distinct() }
+                        .filter { it.isNotEmpty() }.distinctBy { it.first() }
                         .take(if (field == 8) MAX_APPEARS_ON else MAX_RELEASES_PER_GROUP)
                 }
-                val described = if (background) emptyMap() else hydrate(groupIds.values.flatten()).associateBy(Music::id)
+                val described = if (background) emptyMap()
+                    else hydrate(groupVersions.values.flatten().flatten().distinct()).associateBy(Music::id)
                 val grouped = (5..8).associateWith { field ->
                     val inline = metadata.messages(field).flatMap { it.messages(1) }.mapNotNull(::decodeMetadataAlbum).associateBy(Music::id)
-                    groupIds[field].orEmpty().mapNotNull { described[it] ?: inline[it] }
-                        .sortedByDescending { it.note.toIntOrNull() ?: 0 }
+                    groupVersions[field].orEmpty().mapNotNull { versions ->
+                        versions.firstNotNullOfOrNull { described[it] } ?: versions.firstNotNullOfOrNull { inline[it] }
+                    }.distinctReleases().sortedByDescending { it.note.toIntOrNull() ?: 0 }
                 }
                 val listed = grouped.values.flatten().map(Music::id).toSet()
                 val popular = extras.popularReleases.filter { it in listed } +

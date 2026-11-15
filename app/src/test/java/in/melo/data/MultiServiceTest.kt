@@ -231,7 +231,7 @@ class MultiServiceTest {
         assertEquals(`in`.melo.data.preferences.HomeShelf.entries.toSet(), decoded.map { it.shelf }.toSet())
         // A style a shelf does not support falls back to its default.
         val wrong = `in`.melo.data.preferences.HomeLayout.decode("""[{"shelf":"liked","style":"grid","visible":true,"count":4}]""")
-        assertEquals(`in`.melo.data.preferences.ShelfStyle.CARD, wrong.first().style)
+        assertEquals(`in`.melo.data.preferences.ShelfStyle.CARD, wrong.first { it.shelf == `in`.melo.data.preferences.HomeShelf.LIKED }.style)
         assertEquals(`in`.melo.data.preferences.HomeLayout.DEFAULT, `in`.melo.data.preferences.HomeLayout.decode("not json"))
     }
 

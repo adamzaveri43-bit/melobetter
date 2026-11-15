@@ -1,5 +1,23 @@
 package `in`.melo.presentation.screens
 
+import androidx.compose.material.icons.rounded.Wallpaper
+import androidx.compose.material.icons.rounded.PhotoSizeSelectLarge
+import androidx.compose.material.icons.rounded.Cast
+import androidx.compose.material.icons.automirrored.rounded.QueueMusic
+import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.rounded.Crop
+import androidx.compose.material.icons.rounded.LinearScale
+import androidx.compose.material.icons.rounded.SkipPrevious
+import androidx.compose.material.icons.rounded.SkipNext
+import androidx.compose.material.icons.rounded.AutoAwesome
+import androidx.compose.material.icons.rounded.FormatSize
+import androidx.compose.material.icons.rounded.FormatBold
+import androidx.compose.material.icons.rounded.FormatAlignCenter
+import androidx.compose.material.icons.rounded.Animation
+import androidx.compose.material.icons.rounded.BlurOn
+import androidx.compose.material.icons.rounded.Translate
+import androidx.datastore.preferences.core.edit
+import `in`.melo.data.preferences.dataStore
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.SignalCellularAlt
 import androidx.compose.material.icons.rounded.Wifi
@@ -169,6 +187,7 @@ fun SettingsScreen(model: MeloModel, navController: NavHostController) {
         fun open(id: String) = navController.navigateSafely(Screen.SettingsCategory.createRoute(id))
         CategoryRow(stringResource(R.string.settings_category_appearance_title), stringResource(R.string.settings_category_appearance_subtitle), Icons.Rounded.Palette) { open("appearance") }
         CategoryRow(stringResource(R.string.settings_home_title), stringResource(R.string.settings_home_subtitle), Icons.Rounded.Home) { open("home") }
+        CategoryRow(stringResource(R.string.settings_player_title), stringResource(R.string.settings_player_subtitle), Icons.Rounded.MusicNote) { open("player") }
         CategoryRow(stringResource(R.string.settings_pages_title), stringResource(R.string.settings_pages_subtitle), Icons.Rounded.Tune) { open("pages") }
         CategoryRow(stringResource(R.string.settings_category_playback_title), stringResource(R.string.settings_category_playback_subtitle), Icons.Rounded.MusicNote) { open("playback") }
         CategoryRow(stringResource(R.string.settings_category_behavior_title), stringResource(R.string.settings_category_behavior_subtitle), Icons.Rounded.TouchApp) { open("behavior") }
@@ -205,6 +224,7 @@ fun SettingsCategoryScreen(model: MeloModel, navController: NavHostController, c
         "backup" -> BackupSettings(model, navController)
         "account" -> AccountSettings(model, navController)
         "home" -> HomeSettings(model, navController)
+        "player" -> PlayerSettings(model, navController)
         "pages" -> PageActionsSettings(model, navController)
         "diagnostics" -> DiagnosticsSettings(model, navController)
         "privacy" -> PrivacySettings(model, navController)
@@ -670,7 +690,116 @@ private fun styleName(style: `in`.melo.data.preferences.ShelfStyle): String = st
     `in`.melo.data.preferences.ShelfStyle.PILLS -> R.string.shelf_style_pills
     `in`.melo.data.preferences.ShelfStyle.COLLAGE -> R.string.shelf_style_collage
     `in`.melo.data.preferences.ShelfStyle.CARD -> R.string.shelf_style_card
+    `in`.melo.data.preferences.ShelfStyle.YOUTUBE_MUSIC -> R.string.shelf_style_youtube_music
+    `in`.melo.data.preferences.ShelfStyle.SPOTIFY -> R.string.shelf_style_spotify
+    `in`.melo.data.preferences.ShelfStyle.COVER_FLOW -> R.string.shelf_style_cover_flow
 })
+
+/**
+ * The full player, the mini player and the lyrics screen: background, artwork, buttons and text.
+ * The lyrics options that the lyrics screen itself reads from its own store (alignment, animation,
+ * blur, translation, romanization) are written there.
+ */
+@Composable
+private fun PlayerSettings(model: MeloModel, navController: NavHostController) {
+    val s by model.ui.settings.collectAsStateWithLifecycle()
+    val update = model.ui::updateSettings
+    val context = LocalContext.current
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    val store = context.dataStore
+    val lyrics by remember(store) { store.data }.collectAsStateWithLifecycle(initialValue = null)
+    fun bool(key: String, default: Boolean) = lyrics?.get(androidx.datastore.preferences.core.booleanPreferencesKey(key)) ?: default
+    fun setBool(key: String, value: Boolean) = scope.launch { store.edit { it[androidx.datastore.preferences.core.booleanPreferencesKey(key)] = value } }
+    val alignmentKey = androidx.datastore.preferences.core.stringPreferencesKey("lyrics_alignment")
+    val blurKey = androidx.datastore.preferences.core.floatPreferencesKey("animated_lyrics_blur_strength")
+    val backgrounds = mapOf(
+        `in`.melo.data.preferences.PlayerBackground.SOLID to stringResource(R.string.player_background_solid),
+        `in`.melo.data.preferences.PlayerBackground.GRADIENT to stringResource(R.string.player_background_gradient),
+        `in`.melo.data.preferences.PlayerBackground.BLUR to stringResource(R.string.player_background_blur),
+        `in`.melo.data.preferences.PlayerBackground.ANIMATED to stringResource(R.string.player_background_animated),
+    )
+    fun icon(vector: ImageVector): @Composable () -> Unit = { Icon(vector, null, tint = MaterialTheme.colorScheme.secondary) }
+    SettingsScaffold(stringResource(R.string.settings_player_title), navController) {
+        SettingsSection(title = stringResource(R.string.settings_now_playing_section), icon = {}) {
+            ThemeSelectorItem(stringResource(R.string.player_background_title), "", backgrounds, s.playerBackground,
+                { key -> update { it.copy(playerBackground = key) } }, icon(Icons.Rounded.Wallpaper))
+            ThemeSelectorItem(stringResource(R.string.player_artwork_size_title), "", mapOf(
+                `in`.melo.data.preferences.PlayerArtworkSize.SMALL to stringResource(R.string.size_small),
+                `in`.melo.data.preferences.PlayerArtworkSize.MEDIUM to stringResource(R.string.size_medium),
+                `in`.melo.data.preferences.PlayerArtworkSize.LARGE to stringResource(R.string.size_large),
+            ), s.playerArtworkSize, { key -> update { it.copy(playerArtworkSize = key) } }, icon(Icons.Rounded.PhotoSizeSelectLarge))
+            SwitchSettingItem(stringResource(R.string.player_cast_button_title), stringResource(R.string.player_cast_button_subtitle), s.showPlayerCastButton,
+                { v -> update { it.copy(showPlayerCastButton = v) } }, leadingIcon = icon(Icons.Rounded.Cast))
+            SwitchSettingItem(stringResource(R.string.player_queue_button_title), stringResource(R.string.player_queue_button_subtitle), s.showPlayerQueueButton,
+                { v -> update { it.copy(showPlayerQueueButton = v) } }, leadingIcon = icon(Icons.AutoMirrored.Rounded.QueueMusic))
+            SwitchSettingItem(stringResource(R.string.settings_player_menu_title), stringResource(R.string.settings_player_menu_subtitle), s.showPlayerMenuButton,
+                { v -> update { it.copy(showPlayerMenuButton = v) } }, leadingIcon = icon(Icons.Rounded.MoreVert))
+            SwitchSettingItem(stringResource(R.string.settings_show_player_file_info_title), stringResource(R.string.settings_show_player_file_info_subtitle), s.showPlayerFileInfo,
+                { v -> update { it.copy(showPlayerFileInfo = v) } }, leadingIcon = icon(Icons.Rounded.Info))
+        }
+        SettingsSection(title = stringResource(R.string.mini_player_section), icon = {}) {
+            ThemeSelectorItem(stringResource(R.string.mini_artwork_shape_title), "", mapOf(
+                `in`.melo.data.preferences.MiniArtworkShape.CIRCLE to stringResource(R.string.shape_circle),
+                `in`.melo.data.preferences.MiniArtworkShape.ROUNDED to stringResource(R.string.shape_rounded),
+                `in`.melo.data.preferences.MiniArtworkShape.SQUARE to stringResource(R.string.shape_square),
+            ), s.miniArtworkShape, { key -> update { it.copy(miniArtworkShape = key) } }, icon(Icons.Rounded.Crop))
+            SwitchSettingItem(stringResource(R.string.mini_progress_title), stringResource(R.string.mini_progress_subtitle), s.miniShowProgress,
+                { v -> update { it.copy(miniShowProgress = v) } }, leadingIcon = icon(Icons.Rounded.LinearScale))
+            SwitchSettingItem(stringResource(R.string.mini_previous_title), "", s.miniShowPrevious,
+                { v -> update { it.copy(miniShowPrevious = v) } }, leadingIcon = icon(Icons.Rounded.SkipPrevious))
+            SwitchSettingItem(stringResource(R.string.mini_next_title), "", s.miniShowNext,
+                { v -> update { it.copy(miniShowNext = v) } }, leadingIcon = icon(Icons.Rounded.SkipNext))
+        }
+        SettingsSection(title = stringResource(R.string.settings_lyrics_screen_section), icon = {}) {
+            SettingsItem(
+                title = stringResource(R.string.lyrics_apple_preset_title),
+                subtitle = stringResource(R.string.lyrics_apple_preset_subtitle),
+                leadingIcon = icon(Icons.Rounded.AutoAwesome),
+                onClick = {
+                    update { it.copy(lyricsBackground = `in`.melo.data.preferences.PlayerBackground.ANIMATED,
+                        lyricsTextSize = `in`.melo.data.preferences.LyricsTextSize.LARGE, lyricsBold = true) }
+                    scope.launch {
+                        store.edit {
+                            it[alignmentKey] = "left"
+                            it[androidx.datastore.preferences.core.booleanPreferencesKey("use_animated_lyrics")] = true
+                            it[androidx.datastore.preferences.core.booleanPreferencesKey("animated_lyrics_blur_enabled")] = true
+                            it[blurKey] = 3f
+                        }
+                    }
+                },
+            )
+            ThemeSelectorItem(stringResource(R.string.lyrics_background_title), "", backgrounds, s.lyricsBackground,
+                { key -> update { it.copy(lyricsBackground = key) } }, icon(Icons.Rounded.Wallpaper))
+            ThemeSelectorItem(stringResource(R.string.lyrics_text_size_title), "", mapOf(
+                `in`.melo.data.preferences.LyricsTextSize.SMALL to stringResource(R.string.size_small),
+                `in`.melo.data.preferences.LyricsTextSize.MEDIUM to stringResource(R.string.size_medium),
+                `in`.melo.data.preferences.LyricsTextSize.LARGE to stringResource(R.string.size_large),
+                `in`.melo.data.preferences.LyricsTextSize.HUGE to stringResource(R.string.size_huge),
+            ), s.lyricsTextSize, { key -> update { it.copy(lyricsTextSize = key) } }, icon(Icons.Rounded.FormatSize))
+            SwitchSettingItem(stringResource(R.string.lyrics_bold_title), "", s.lyricsBold,
+                { v -> update { it.copy(lyricsBold = v) } }, leadingIcon = icon(Icons.Rounded.FormatBold))
+            ThemeSelectorItem(stringResource(R.string.lyrics_alignment_title), "", mapOf(
+                "left" to stringResource(R.string.align_start), "center" to stringResource(R.string.align_center), "right" to stringResource(R.string.align_end),
+            ), lyrics?.get(alignmentKey) ?: "left", { key -> scope.launch { store.edit { it[alignmentKey] = key } } }, icon(Icons.Rounded.FormatAlignCenter))
+            SwitchSettingItem(stringResource(R.string.lyrics_animated_title), stringResource(R.string.lyrics_animated_subtitle), bool("use_animated_lyrics", false),
+                { v -> setBool("use_animated_lyrics", v) }, leadingIcon = icon(Icons.Rounded.Animation))
+            SwitchSettingItem(stringResource(R.string.lyrics_blur_title), stringResource(R.string.lyrics_blur_subtitle), bool("animated_lyrics_blur_enabled", true),
+                { v -> setBool("animated_lyrics_blur_enabled", v) }, leadingIcon = icon(Icons.Rounded.BlurOn), enabled = bool("use_animated_lyrics", false))
+            if (bool("use_animated_lyrics", false) && bool("animated_lyrics_blur_enabled", true)) SliderSettingsItem(
+                label = stringResource(R.string.lyrics_blur_strength_title),
+                value = lyrics?.get(blurKey) ?: 2.5f, valueRange = 0.5f..6f, steps = 10,
+                onValueChange = { v -> scope.launch { store.edit { it[blurKey] = v } } },
+                valueText = { "%.1f".format(it) },
+            )
+            SwitchSettingItem(stringResource(R.string.lyrics_translation_title), "", bool("show_lyrics_translation", true),
+                { v -> setBool("show_lyrics_translation", v) }, leadingIcon = icon(Icons.Rounded.Translate))
+            SwitchSettingItem(stringResource(R.string.lyrics_romanization_title), "", bool("show_lyrics_romanization", true),
+                { v -> setBool("show_lyrics_romanization", v) }, leadingIcon = icon(Icons.Rounded.Translate))
+            SwitchSettingItem(stringResource(R.string.settings_immersive_lyrics_title), stringResource(R.string.settings_immersive_lyrics_subtitle), s.immersiveLyrics,
+                { v -> update { it.copy(immersiveLyrics = v) } }, leadingIcon = { Icon(painterResource(R.drawable.rounded_lyrics_24), null, tint = MaterialTheme.colorScheme.secondary) })
+        }
+    }
+}
 
 /** Which shelves the home screen shows, in which order, with which layout and how many items. */
 @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)

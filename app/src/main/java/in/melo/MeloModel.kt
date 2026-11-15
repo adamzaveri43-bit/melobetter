@@ -580,8 +580,15 @@ class MeloModel(private val app: Application) : AndroidViewModel(app) {
                     withContext(Dispatchers.IO) { listeningHistory.record(track) }
                 }
                 if (track != null && playback.playing && mutableRecent.value.firstOrNull()?.id != track.id) {
-                    mutableRecent.update { (listOf(track) + it.filterNot { previous -> previous.id == track.id }).take(12) }
+                    mutableRecent.update { (listOf(track) + it.filterNot { previous -> previous.id == track.id }).take(RECENT_LIMIT) }
                 }
+            }
+        }
+        viewModelScope.launch {
+            // Recently played survives restarts: it is the listening history, one entry per track, newest first.
+            withContext(Dispatchers.IO) { listeningHistory.load() }
+            listeningHistory.entries.collect { entries ->
+                mutableRecent.value = entries.map { it.track }.distinctBy(Music::id).take(RECENT_LIMIT)
             }
         }
         viewModelScope.launch {
@@ -1661,6 +1668,7 @@ class MeloModel(private val app: Application) : AndroidViewModel(app) {
         private const val KEY_PENDING_UNLIKES = "pending_unlikes"
         private const val KEY_YOUTUBE_PLAYLISTS = "youtube_playlists"
         private const val KEY_FEED = "home_feed"
+        private const val RECENT_LIMIT = 30
         private const val FEED_LIFETIME_MS = 30 * 60_000L
         private const val FEED_SEEDS = 3
         private const val FEED_RADIO_TRACKS = 20

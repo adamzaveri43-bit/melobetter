@@ -256,6 +256,8 @@ fun LyricsSheet(
     onRepeatToggle: () -> Unit,
     onFavoriteToggle: () -> Unit,
     modifier: Modifier = Modifier,
+    /** Settings → Player → Lyrics background: a [`in`.melo.data.preferences.PlayerBackground] key. */
+    backdropStyle: String = `in`.melo.data.preferences.PlayerBackground.SOLID,
     swipeThreshold: Dp = 100.dp,
     highlightZoneFraction: Float = 0.08f, // Reduced from 0.22 for less padding
     highlightOffsetDp: Dp = 32.dp,
@@ -681,6 +683,9 @@ fun LyricsSheet(
         // Removed TopBar and FAB
     ) { paddingValues ->
         Box(modifier = Modifier.fillMaxSize()) {
+            `in`.melo.presentation.components.player.PlayerBackdrop(
+                backdropStyle, currentSong?.albumArtUriString?.takeIf { it.isNotBlank() }, colorScheme,
+            )
             Column(
                 modifier = Modifier
                     .fillMaxSize()

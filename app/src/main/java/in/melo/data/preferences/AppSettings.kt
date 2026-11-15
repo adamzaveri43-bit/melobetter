@@ -69,6 +69,20 @@ data class AppSettings(
     val showSearchSources: Boolean = false,
     /** Firebase usage analytics is enabled by default and can be disabled in Privacy settings. */
     val analyticsEnabled: Boolean = true,
+    /** Full player: [PlayerBackground] key, [PlayerArtworkSize] key, and which top bar buttons show. */
+    val playerBackground: String = PlayerBackground.SOLID,
+    val playerArtworkSize: String = PlayerArtworkSize.LARGE,
+    val showPlayerCastButton: Boolean = true,
+    val showPlayerQueueButton: Boolean = true,
+    /** Mini player: [MiniArtworkShape] key, its skip buttons, and a progress line along its bottom edge. */
+    val miniArtworkShape: String = MiniArtworkShape.CIRCLE,
+    val miniShowPrevious: Boolean = true,
+    val miniShowNext: Boolean = true,
+    val miniShowProgress: Boolean = false,
+    /** Lyrics screen: [PlayerBackground] key, [LyricsTextSize] key, and bold text. */
+    val lyricsBackground: String = PlayerBackground.SOLID,
+    val lyricsTextSize: String = LyricsTextSize.MEDIUM,
+    val lyricsBold: Boolean = false,
 ) {
     fun actions(page: DetailPage): List<ActionSlot> =
         DetailActions.decode(page, if (page == DetailPage.ALBUM) albumActions else playlistActions)
@@ -96,6 +110,11 @@ data class AppSettings(
         .put("downloadQuality", downloadQuality).put("audioNormalization", audioNormalization)
         .put("showPlayerMenuButton", showPlayerMenuButton).put("miniPlayerSwipe", miniPlayerSwipe)
         .put("showSearchSources", showSearchSources).put("analyticsEnabled", analyticsEnabled)
+        .put("playerBackground", playerBackground).put("playerArtworkSize", playerArtworkSize)
+        .put("showPlayerCastButton", showPlayerCastButton).put("showPlayerQueueButton", showPlayerQueueButton)
+        .put("miniArtworkShape", miniArtworkShape).put("miniShowPrevious", miniShowPrevious).put("miniShowNext", miniShowNext)
+        .put("miniShowProgress", miniShowProgress).put("lyricsBackground", lyricsBackground)
+        .put("lyricsTextSize", lyricsTextSize).put("lyricsBold", lyricsBold)
 
     companion object {
         const val THEME_SYSTEM = "system"
@@ -164,6 +183,17 @@ data class AppSettings(
                     .takeIf { it in setOf(MINI_SWIPE_TRACKS, MINI_SWIPE_DISMISS, MINI_SWIPE_OFF) } ?: d.miniPlayerSwipe,
                 showSearchSources = json.optBoolean("showSearchSources", d.showSearchSources),
                 analyticsEnabled = json.optBoolean("analyticsEnabled", d.analyticsEnabled),
+                playerBackground = json.optString("playerBackground", d.playerBackground).takeIf { it in PlayerBackground.ALL } ?: d.playerBackground,
+                playerArtworkSize = json.optString("playerArtworkSize", d.playerArtworkSize).takeIf { it in PlayerArtworkSize.ALL } ?: d.playerArtworkSize,
+                showPlayerCastButton = json.optBoolean("showPlayerCastButton", d.showPlayerCastButton),
+                showPlayerQueueButton = json.optBoolean("showPlayerQueueButton", d.showPlayerQueueButton),
+                miniArtworkShape = json.optString("miniArtworkShape", d.miniArtworkShape).takeIf { it in MiniArtworkShape.ALL } ?: d.miniArtworkShape,
+                miniShowPrevious = json.optBoolean("miniShowPrevious", d.miniShowPrevious),
+                miniShowNext = json.optBoolean("miniShowNext", d.miniShowNext),
+                miniShowProgress = json.optBoolean("miniShowProgress", d.miniShowProgress),
+                lyricsBackground = json.optString("lyricsBackground", d.lyricsBackground).takeIf { it in PlayerBackground.ALL } ?: d.lyricsBackground,
+                lyricsTextSize = json.optString("lyricsTextSize", d.lyricsTextSize).takeIf { it in LyricsTextSize.ALL } ?: d.lyricsTextSize,
+                lyricsBold = json.optBoolean("lyricsBold", d.lyricsBold),
             )
         }
     }
