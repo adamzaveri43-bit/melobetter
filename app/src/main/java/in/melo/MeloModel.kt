@@ -223,6 +223,7 @@ class MeloModel(private val app: Application) : AndroidViewModel(app) {
         // The cookies are now kept encrypted: the WebView's own copy is removed.
         runCatching { android.webkit.CookieManager.getInstance().apply { removeAllCookies(null); flush() } }
         refreshYouTubeLibrary()
+        feedJob?.cancel(); refreshFeed(force = true)
         return info
     }
 
@@ -238,6 +239,9 @@ class MeloModel(private val app: Application) : AndroidViewModel(app) {
         youTubeRows.clear()
         preferences.edit { remove(KEY_YOUTUBE_PLAYLISTS); remove(KEY_YOUTUBE_EDITABLE) }
         mutableDetails.update { it - ids }
+        // The home feed was read with the account: it is read again without it.
+        feedJob?.cancel(); mutableFeed.value = emptyList(); preferences.edit { remove(KEY_FEED) }
+        refreshFeed(force = true)
         // Pages read with the account (private playlists included) do not stay on the device.
         viewModelScope.launch(Dispatchers.IO) { ids.forEach(store::removeDetail) }
     }
@@ -247,6 +251,94 @@ class MeloModel(private val app: Application) : AndroidViewModel(app) {
         mutableMessage.value = app.getString(`in`.melo.R.string.google_session_closed)
         `in`.melo.data.diagnostics.DiagnosticLog.record("youtube-account", "signed out: ${failure.message}")
     }
+
+    // Home feed ----------------------------------------------------------------------------------
+
+    private val mutableFeed = MutableStateFlow(decodeFeed(preferences.getString(KEY_FEED, null)))
+    /** The music the home screen suggests: radios from recent plays, then YouTube Music's own shelves. Kept between starts. */
+    val feed = mutableFeed.asStateFlow()
+    private val mutableFeedLoading = MutableStateFlow(false)
+    val feedLoading = mutableFeedLoading.asStateFlow()
+    private var feedJob: Job? = null
+    private var feedReadAt = 0L
+
+    /** Reads the feed again, unless it was read in the last few minutes and [force] is false. */
+    fun refreshFeed(force: Boolean = false) {
+        if (!online.value || feedJob?.isActive == true) return
+        if (!force && mutableFeed.value.isNotEmpty() && android.os.SystemClock.elapsedRealtime() - feedReadAt < FEED_LIFETIME_MS) return
+        feedJob = viewModelScope.launch {
+            mutableFeedLoading.value = true
+            try {
+                val shelves = withContext(Dispatchers.IO) { readFeed() }
+                if (shelves.isNotEmpty()) {
+                    feedReadAt = android.os.SystemClock.elapsedRealtime()
+                    shelves.forEach { shelf -> shelf.items.forEach { ui.register(it) } }
+                    mutableFeed.value = shelves
+                    preferences.edit { putString(KEY_FEED, encodeFeed(shelves)) }
+                }
+            } catch (cancelled: CancellationException) { throw cancelled }
+            catch (failure: Exception) {
+                `in`.melo.data.diagnostics.DiagnosticLog.record("home-feed", "${failure.javaClass.simpleName} \"${failure.message}\"")
+            } finally { mutableFeedLoading.value = false }
+        }
+    }
+
+    private suspend fun readFeed(): List<`in`.melo.data.youtube.FeedShelf> = kotlinx.coroutines.coroutineScope {
+        listeningHistory.load()
+        // Seeds: the last tracks played, one per artist, so two radios do not sound the same.
+        val seeds = (mutableRecent.value + listeningHistory.entries.value.map { it.track })
+            .filter { it.kind == MusicKind.Track }
+            .distinctBy { it.subtitle.lowercase(Locale.ROOT).ifBlank { it.id } }
+            .take(FEED_SEEDS)
+        val radios = seeds.mapIndexed { index, seed ->
+            async {
+                runCatching {
+                    val videoId = `in`.melo.data.youtube.YouTubeFeed.videoIdFor(seed) ?: return@runCatching null
+                    val tracks = `in`.melo.data.youtube.YouTubeFeed.radio(videoId).take(FEED_RADIO_TRACKS)
+                    val title = if (index == 0) app.getString(`in`.melo.R.string.home_quick_picks)
+                        else app.getString(`in`.melo.R.string.home_more_like, seed.title)
+                    tracks.takeIf { it.isNotEmpty() }?.let { `in`.melo.data.youtube.FeedShelf("radio_$index", title, it, tracksOnly = true) }
+                }.getOrNull()
+            }
+        }
+        val home = async {
+            try { `in`.melo.data.youtube.YouTubeFeed.home() }
+            catch (cancelled: CancellationException) { throw cancelled }
+            catch (failure: Exception) {
+                `in`.melo.data.diagnostics.DiagnosticLog.record("home-feed", "home ${failure.javaClass.simpleName}")
+                emptyList()
+            }
+        }
+        val discover = async {
+            `in`.melo.data.youtube.YouTubeFeed.discover(mapOf(
+                "explore" to app.getString(`in`.melo.R.string.home_explore),
+                "new" to app.getString(`in`.melo.R.string.home_new_releases),
+                "charts" to app.getString(`in`.melo.R.string.home_charts),
+            ))
+        }
+        val made = radios.mapNotNull { it.await() }
+        // Quick picks first, YouTube Music's home next, the other radios between it and the public pages.
+        (made.take(1) + home.await() + made.drop(1) + discover.await())
+            .filter { it.items.isNotEmpty() }
+            .distinctBy { it.title.lowercase(Locale.ROOT).ifBlank { it.key } }
+    }
+
+    private fun encodeFeed(shelves: List<`in`.melo.data.youtube.FeedShelf>): String = org.json.JSONArray().apply {
+        shelves.forEach { shelf ->
+            put(org.json.JSONObject().put("key", shelf.key).put("title", shelf.title).put("tracksOnly", shelf.tracksOnly)
+                .put("items", org.json.JSONArray(encodePins(shelf.items))))
+        }
+    }.toString()
+
+    private fun decodeFeed(encoded: String?): List<`in`.melo.data.youtube.FeedShelf> = runCatching {
+        val array = org.json.JSONArray(encoded ?: return emptyList())
+        (0 until array.length()).mapNotNull { index ->
+            val entry = array.optJSONObject(index) ?: return@mapNotNull null
+            val items = decodePins(entry.optJSONArray("items")?.toString())
+            `in`.melo.data.youtube.FeedShelf(entry.optString("key"), entry.optString("title"), items, entry.optBoolean("tracksOnly"))
+                .takeIf { items.isNotEmpty() }
+        }
+    }.getOrDefault(emptyList())
 
     fun refreshYouTubeLibrary() {
         if (!YouTubeAccount.signedIn || !online.value || youTubeJob?.isActive == true) return
@@ -475,6 +567,7 @@ class MeloModel(private val app: Application) : AndroidViewModel(app) {
         }
         refreshLocalTracks()
         refreshYouTubeLibrary()
+        refreshFeed()
         viewModelScope.launch {
             // One history entry each time a queue position starts playing.
             var counted: String? = null
@@ -494,7 +587,7 @@ class MeloModel(private val app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             var wasOnline = online.value
             online.collect { now ->
-                if (now && !wasOnline) refreshYouTubeLibrary()
+                if (now && !wasOnline) { refreshYouTubeLibrary(); refreshFeed() }
                 if (now && !wasOnline && collections != null) {
                     sendPendingFavorites()
                     val age = withContext(Dispatchers.IO) { store.libraryAgeMs() }
@@ -629,6 +722,7 @@ class MeloModel(private val app: Application) : AndroidViewModel(app) {
 
     fun refreshLibrary() {
         refreshYouTubeLibrary()
+        refreshFeed(force = true)
         val source = collections ?: return
         if (!online.value && mutableLibrary.value.content != null) return
         libraryJob?.cancel()
@@ -1566,6 +1660,10 @@ class MeloModel(private val app: Application) : AndroidViewModel(app) {
         private const val KEY_PLAYLIST_COVERS = "playlist_covers"
         private const val KEY_PENDING_UNLIKES = "pending_unlikes"
         private const val KEY_YOUTUBE_PLAYLISTS = "youtube_playlists"
+        private const val KEY_FEED = "home_feed"
+        private const val FEED_LIFETIME_MS = 30 * 60_000L
+        private const val FEED_SEEDS = 3
+        private const val FEED_RADIO_TRACKS = 20
         private const val KEY_YOUTUBE_EDITABLE = "youtube_editable"
         private const val FAVORITE_LAG_MS = 2 * 60 * 1000L
         private const val LIBRARY_TTL_MS = 10 * 60 * 1000L

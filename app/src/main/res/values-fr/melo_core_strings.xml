@@ -85,9 +85,14 @@
     <string name="pin_removed">Retiré de l’accueil</string>
     <string name="pin_added">Épinglé sur l’accueil</string>
     <string name="timer_end_track">Fin du titre</string>
-    <string name="home_playlists">Vos playlists</string>
     <string name="home_albums">Vos albums</string>
     <string name="home_artists">Vos artistes</string>
+    <string name="home_feed">Suggestions pour vous</string>
+    <string name="home_quick_picks">Sélection rapide</string>
+    <string name="home_more_like">Dans le même esprit que %1$s</string>
+    <string name="home_explore">Explorer</string>
+    <string name="home_new_releases">Nouveautés</string>
+    <string name="home_charts">Classements</string>
     <string name="code_prompt">Code de vérification Spotify</string>
     <string name="code_label">Code Spotify</string>
     <string name="code_confirm">Confirmer le code</string>
@@ -199,8 +204,6 @@
     <string name="playlist_cover_remove">Retirer la pochette</string>
     <string name="home_pins">Épinglés</string>
     <string name="home_recent">Écoutés récemment</string>
-    <string name="home_multi_service">Playlists multiservices</string>
-    <string name="home_spotify_playlists">Playlists Spotify</string>
     <string name="home_local_files">Fichiers de l’appareil</string>
     <string name="settings_home_title">Accueil</string>
     <string name="settings_home_subtitle">Étagères, ordre, disposition et taille</string>
@@ -272,7 +275,6 @@
     <string name="google_signin_failed">YouTube Music n’a pas ouvert de session avec ce compte.</string>
     <string name="google_signin_retry">Réessayer</string>
     <string name="google_session_closed">Google a fermé la session YouTube Music. Reconnectez le compte dans Réglages → Comptes.</string>
-    <string name="home_youtube_playlists">Playlists YouTube Music</string>
     <string name="youtube_playlist_account">Sur mon compte YouTube Music</string>
     <string name="youtube_playlist_public">Publique</string>
     <string name="youtube_playlist_edit">Modifier la playlist YouTube Music</string>

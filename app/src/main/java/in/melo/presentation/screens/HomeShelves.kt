@@ -101,6 +101,34 @@ internal fun ShelfListRow(item: Music, ui: PlayerViewModel, onClick: () -> Unit,
     }
 }
 
+/**
+ * Songs four to a column, in columns that scroll sideways, as YouTube Music lays out its quick
+ * picks: a long list of suggestions that takes the height of four rows.
+ */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+internal fun QuickPicks(items: List<Music>, ui: PlayerViewModel, onClick: (Music) -> Unit, onLongClick: (Music) -> Unit) {
+    val width = (androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp.dp - MeloLayout.PageGutter * 2) * 0.9f
+    LazyRow(contentPadding = PaddingValues(horizontal = MeloLayout.PageGutter), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        items(items.chunked(QUICK_PICK_ROWS), key = { it.first().id }) { column ->
+            Column(Modifier.width(width), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                column.forEach { item ->
+                    val shape = MeloLayout.ArtworkShape
+                    Row(
+                        Modifier.fillMaxWidth().clip(shape).combinedClickable(onClick = { onClick(item) }, onLongClick = { onLongClick(item) }).padding(vertical = 5.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Cover(item, ui, MaterialTheme.colorScheme.surfaceContainerHighest, shape, Modifier.size(52.dp))
+                        CardTexts(item, false, Modifier.weight(1f).padding(horizontal = 12.dp))
+                    }
+                }
+            }
+        }
+    }
+}
+
+private const val QUICK_PICK_ROWS = 4
+
 /** Lays out a shelf's items in the chosen [style]. Pills are drawn by the caller. */
 @Composable
 internal fun ShelfItems(

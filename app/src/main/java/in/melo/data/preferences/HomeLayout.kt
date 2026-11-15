@@ -3,16 +3,17 @@ package `in`.melo.data.preferences
 import org.json.JSONArray
 import org.json.JSONObject
 
-/** The shelves the home screen can show. */
+/** The shelves the home screen can show. The user's playlists are not among them: they live in the library. */
 enum class HomeShelf(val key: String, val styles: List<ShelfStyle>, val counts: Boolean = true) {
     PINS("pins", listOf(ShelfStyle.COLLAGE, ShelfStyle.PILLS, ShelfStyle.CAROUSEL, ShelfStyle.GRID, ShelfStyle.LIST)),
     RECENT("recent", listOf(ShelfStyle.CAROUSEL, ShelfStyle.LARGE, ShelfStyle.GRID, ShelfStyle.LIST, ShelfStyle.PILLS)),
+    /**
+     * Suggested music, as YouTube Music and Spotify open on: one row per suggestion shelf. Track
+     * shelves always use the quick picks layout; the style applies to the cover shelves.
+     */
+    FEED("feed", listOf(ShelfStyle.CAROUSEL, ShelfStyle.LARGE)),
     DOWNLOADS("downloads", listOf(ShelfStyle.CAROUSEL, ShelfStyle.LARGE, ShelfStyle.GRID, ShelfStyle.LIST, ShelfStyle.PILLS)),
     LIKED("liked", listOf(ShelfStyle.CARD), counts = false),
-    PLAYLISTS("playlists", listOf(ShelfStyle.CAROUSEL, ShelfStyle.LARGE, ShelfStyle.GRID, ShelfStyle.LIST, ShelfStyle.PILLS)),
-    MULTI_SERVICE("multi_service", listOf(ShelfStyle.CAROUSEL, ShelfStyle.LARGE, ShelfStyle.GRID, ShelfStyle.LIST, ShelfStyle.PILLS)),
-    SPOTIFY_PLAYLISTS("spotify_playlists", listOf(ShelfStyle.CAROUSEL, ShelfStyle.LARGE, ShelfStyle.GRID, ShelfStyle.LIST, ShelfStyle.PILLS)),
-    YOUTUBE_PLAYLISTS("youtube_playlists", listOf(ShelfStyle.CAROUSEL, ShelfStyle.LARGE, ShelfStyle.GRID, ShelfStyle.LIST, ShelfStyle.PILLS)),
     ALBUMS("albums", listOf(ShelfStyle.CAROUSEL, ShelfStyle.LARGE, ShelfStyle.GRID, ShelfStyle.LIST, ShelfStyle.PILLS)),
     ARTISTS("artists", listOf(ShelfStyle.CAROUSEL, ShelfStyle.LARGE, ShelfStyle.GRID, ShelfStyle.LIST, ShelfStyle.PILLS)),
     LOCAL_FILES("local_files", listOf(ShelfStyle.LIST, ShelfStyle.CAROUSEL, ShelfStyle.GRID, ShelfStyle.PILLS)),
@@ -38,19 +39,19 @@ enum class ShelfStyle(val key: String) {
 
 data class ShelfConfig(val shelf: HomeShelf, val visible: Boolean, val style: ShelfStyle, val count: Int, val showTitle: Boolean = true)
 
-/** Home screen layout: shelves in display order. Unknown or missing shelves get their defaults. */
+/**
+ * Home screen layout: shelves in display order. Unknown shelves (the playlist shelves of earlier
+ * versions) are dropped; missing ones get their defaults, after the shelf they follow by default.
+ */
 object HomeLayout {
     val COUNTS = listOf(4, 6, 10, 20, 50)
 
     val DEFAULT: List<ShelfConfig> = listOf(
         ShelfConfig(HomeShelf.PINS, true, ShelfStyle.PILLS, 6),
         ShelfConfig(HomeShelf.RECENT, true, ShelfStyle.CAROUSEL, 6),
+        ShelfConfig(HomeShelf.FEED, true, ShelfStyle.CAROUSEL, 20),
         ShelfConfig(HomeShelf.DOWNLOADS, true, ShelfStyle.CAROUSEL, 6),
         ShelfConfig(HomeShelf.LIKED, true, ShelfStyle.CARD, 1),
-        ShelfConfig(HomeShelf.PLAYLISTS, true, ShelfStyle.CAROUSEL, 20),
-        ShelfConfig(HomeShelf.MULTI_SERVICE, false, ShelfStyle.CAROUSEL, 20),
-        ShelfConfig(HomeShelf.SPOTIFY_PLAYLISTS, false, ShelfStyle.CAROUSEL, 20),
-        ShelfConfig(HomeShelf.YOUTUBE_PLAYLISTS, false, ShelfStyle.CAROUSEL, 20),
         ShelfConfig(HomeShelf.ALBUMS, true, ShelfStyle.CAROUSEL, 20),
         ShelfConfig(HomeShelf.ARTISTS, true, ShelfStyle.CAROUSEL, 20),
         ShelfConfig(HomeShelf.LOCAL_FILES, false, ShelfStyle.LIST, 6),
@@ -69,7 +70,13 @@ object HomeLayout {
                     entry.optInt("count", fallback.count).coerceIn(1, 50), entry.optBoolean("title", true))
             }.distinctBy { it.shelf }
         } catch (_: org.json.JSONException) { return DEFAULT }
-        return read + DEFAULT.filter { default -> read.none { it.shelf == default.shelf } }
+        val result = read.toMutableList()
+        DEFAULT.forEachIndexed { index, default ->
+            if (result.any { it.shelf == default.shelf }) return@forEachIndexed
+            val after = DEFAULT.take(index).lastOrNull { previous -> result.any { it.shelf == previous.shelf } }
+            result.add(after?.let { previous -> result.indexOfFirst { it.shelf == previous.shelf } + 1 } ?: 0, default)
+        }
+        return result
     }
 
     fun encode(shelves: List<ShelfConfig>): String = JSONArray().apply {

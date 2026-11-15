@@ -108,8 +108,9 @@ private const val COLLAGE_ITEMS = 6
 private const val COLLAGE_MINIMUM = 3
 
 /**
- * The home canvas, with generated mixes and statistics replaced by what this app is
- * for: the items pinned on this device first, then the Spotify library.
+ * The home canvas: the items pinned on this device and recent plays, then suggested music
+ * (quick picks and radios from recent plays, YouTube Music's home, new releases and charts).
+ * The user's own playlists are not shown here: they are opened from the library.
  */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -119,10 +120,8 @@ fun HomeScreen(model: MeloModel, navController: NavHostController, paddingValues
     val downloads by ui.downloadCollections.collectAsStateWithLifecycle()
     val downloadsTitle = stringResource(R.string.home_downloads)
     val settings by ui.settings.collectAsStateWithLifecycle()
-    val localPlaylists by model.localPlaylists.collectAsStateWithLifecycle()
-    val youTubePlaylists by model.youTubePlaylists.collectAsStateWithLifecycle()
-    val localBadge = stringResource(R.string.badge_local)
-    val playlistsTitle = stringResource(R.string.home_playlists)
+    val feed by model.feed.collectAsStateWithLifecycle()
+    val feedLoading by model.feedLoading.collectAsStateWithLifecycle()
     val albumsTitle = stringResource(R.string.home_albums)
     val artistsTitle = stringResource(R.string.home_artists)
     val recent by model.recent.collectAsStateWithLifecycle()
@@ -130,9 +129,6 @@ fun HomeScreen(model: MeloModel, navController: NavHostController, paddingValues
     val shelfTitles = mapOf(
         HomeShelf.PINS to stringResource(R.string.home_pins),
         HomeShelf.RECENT to stringResource(R.string.home_recent),
-        HomeShelf.MULTI_SERVICE to stringResource(R.string.home_multi_service),
-        HomeShelf.SPOTIFY_PLAYLISTS to stringResource(R.string.home_spotify_playlists),
-        HomeShelf.YOUTUBE_PLAYLISTS to stringResource(R.string.home_youtube_playlists),
         HomeShelf.LOCAL_FILES to stringResource(R.string.home_local_files),
     )
     val library by model.library.collectAsStateWithLifecycle()
@@ -185,7 +181,7 @@ fun HomeScreen(model: MeloModel, navController: NavHostController, paddingValues
                             onLibrary = openLibrary,
                         )
                     }
-                    if (content == null && library.loading) {
+                    if (content == null && library.loading && feed.isEmpty()) {
                         item(key = "library_loading") {
                             ListeningShelfPlaceholder()
                         }
@@ -202,9 +198,9 @@ fun HomeScreen(model: MeloModel, navController: NavHostController, paddingValues
                         }
                     }
                     val hasListeningContent = pins.isNotEmpty() || recent.isNotEmpty() || localFiles.isNotEmpty() ||
-                        localPlaylists.isNotEmpty() || youTubePlaylists.isNotEmpty() || downloads.isNotEmpty() ||
-                        content?.let { it.savedTrackCount > 0 || it.playlists.isNotEmpty() || it.albums.isNotEmpty() || it.artists.isNotEmpty() } == true
-                    if (!hasListeningContent && !library.loading && library.error == null) {
+                        downloads.isNotEmpty() || feed.isNotEmpty() ||
+                        content?.let { it.savedTrackCount > 0 || it.albums.isNotEmpty() || it.artists.isNotEmpty() } == true
+                    if (!hasListeningContent && !library.loading && !feedLoading && library.error == null) {
                         item(key = "empty_home") {
                             ListeningStatusCard(
                                 stringResource(R.string.melo_empty_home_title),
@@ -217,11 +213,9 @@ fun HomeScreen(model: MeloModel, navController: NavHostController, paddingValues
                     }
                     // Shelves in the order, layout and size chosen in Settings → Home.
                     settings.homeLayout.filter { it.visible }.forEach { config ->
-                        val multi = localPlaylists.map { it.asMusic().copy(subtitle = localBadge + " · " + it.asMusic().subtitle) }
                         val openTab: (`in`.melo.data.model.LibraryTabId) -> () -> Unit = { tab -> { ui.requestedLibraryTab.value = tab.storageKey; openLibrary() } }
                         val title = when (config.shelf) {
                             HomeShelf.DOWNLOADS -> downloadsTitle
-                            HomeShelf.PLAYLISTS -> playlistsTitle
                             HomeShelf.ALBUMS -> albumsTitle
                             HomeShelf.ARTISTS -> artistsTitle
                             else -> shelfTitles[config.shelf].orEmpty()
@@ -230,16 +224,16 @@ fun HomeScreen(model: MeloModel, navController: NavHostController, paddingValues
                             HomeShelf.PINS -> pins to null
                             HomeShelf.RECENT -> recent to null
                             HomeShelf.DOWNLOADS -> downloads.values.filter { it.isComplete }.map { it.collection.item } to openTab(`in`.melo.data.model.LibraryTabId.DOWNLOADS)
-                            HomeShelf.LIKED -> emptyList<Music>() to null
-                            HomeShelf.PLAYLISTS -> (multi + youTubePlaylists + content?.playlists.orEmpty()) to openTab(`in`.melo.data.model.LibraryTabId.PLAYLISTS)
-                            HomeShelf.MULTI_SERVICE -> multi to openTab(`in`.melo.data.model.LibraryTabId.PLAYLISTS)
-                            HomeShelf.SPOTIFY_PLAYLISTS -> content?.playlists.orEmpty() to openTab(`in`.melo.data.model.LibraryTabId.PLAYLISTS)
-                            HomeShelf.YOUTUBE_PLAYLISTS -> youTubePlaylists to openTab(`in`.melo.data.model.LibraryTabId.PLAYLISTS)
+                            HomeShelf.LIKED, HomeShelf.FEED -> emptyList<Music>() to null
                             HomeShelf.ALBUMS -> content?.albums.orEmpty() to openTab(`in`.melo.data.model.LibraryTabId.ALBUMS)
                             HomeShelf.ARTISTS -> content?.artists.orEmpty() to openTab(`in`.melo.data.model.LibraryTabId.ARTISTS)
                             HomeShelf.LOCAL_FILES -> localFiles to openTab(`in`.melo.data.model.LibraryTabId.LOCAL)
                         }
                         when {
+                            config.shelf == HomeShelf.FEED -> {
+                                if (feed.isEmpty() && feedLoading) item(key = "feed_loading") { ListeningShelfPlaceholder() }
+                                feed.forEach { shelf -> feedShelf(shelf, config.style, config.count, config.showTitle, ui, open, showOptions) }
+                            }
                             config.shelf == HomeShelf.LIKED -> if (content != null && content.savedTrackCount > 0) item(key = "liked", contentType = "liked") {
                                 LikedSongsCard(
                                     count = content.savedTrackCount,
@@ -313,6 +307,34 @@ private fun androidx.compose.foundation.lazy.LazyListScope.homeShelf(
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             if (title != null) SectionHeader(title, openAll)
             ShelfItems(items, style, ui, onClick, onLongPress) { item, modifier ->
+                PinnedPill(item, ui, modifier, { onClick(item) }, { onLongPress(item) })
+            }
+        }
+    }
+}
+
+/** One shelf of suggestions: songs in quick picks columns, albums, artists and playlists as covers. */
+private fun androidx.compose.foundation.lazy.LazyListScope.feedShelf(
+    shelf: `in`.melo.data.youtube.FeedShelf,
+    style: ShelfStyle,
+    count: Int,
+    showTitle: Boolean,
+    ui: PlayerViewModel,
+    open: (Music) -> Unit,
+    onLongPress: (Music) -> Unit,
+) {
+    val items = shelf.items.take(count)
+    if (items.isEmpty()) return
+    val tracks = items.filter { it.kind == MusicKind.Track }
+    val onClick: (Music) -> Unit = { item ->
+        // A song starts the shelf's songs from it, as a radio or chart is played.
+        if (item.kind == MusicKind.Track) ui.playSongs(tracks.map { it.toSong() }, item.toSong(), shelf.title) else open(item)
+    }
+    item(key = "feed_" + shelf.key, contentType = if (shelf.tracksOnly) "feed_quick_picks" else "shelf_${style.key}") {
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            if (showTitle && shelf.title.isNotBlank()) SectionHeader(shelf.title, null)
+            if (shelf.tracksOnly) QuickPicks(items, ui, onClick, onLongPress)
+            else ShelfItems(items, style, ui, onClick, onLongPress) { item, modifier ->
                 PinnedPill(item, ui, modifier, { onClick(item) }, { onLongPress(item) })
             }
         }

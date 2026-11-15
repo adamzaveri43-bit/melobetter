@@ -85,9 +85,14 @@
     <string name="pin_removed">Removed from home</string>
     <string name="pin_added">Pinned to home</string>
     <string name="timer_end_track">End of track</string>
-    <string name="home_playlists">Your playlists</string>
     <string name="home_albums">Your albums</string>
     <string name="home_artists">Your artists</string>
+    <string name="home_feed">Suggested for you</string>
+    <string name="home_quick_picks">Quick picks</string>
+    <string name="home_more_like">More like %1$s</string>
+    <string name="home_explore">Explore</string>
+    <string name="home_new_releases">New releases</string>
+    <string name="home_charts">Charts</string>
     <string name="code_prompt">Spotify verification code</string>
     <string name="code_label">Spotify code</string>
     <string name="code_confirm">Confirm code</string>
@@ -199,8 +204,6 @@
     <string name="playlist_cover_remove">Remove cover</string>
     <string name="home_pins">Pinned</string>
     <string name="home_recent">Recently played</string>
-    <string name="home_multi_service">Multi-service playlists</string>
-    <string name="home_spotify_playlists">Spotify playlists</string>
     <string name="home_local_files">Files on this device</string>
     <string name="settings_home_title">Home</string>
     <string name="settings_home_subtitle">Shelves, order, layout and size</string>
@@ -272,7 +275,6 @@
     <string name="google_signin_failed">YouTube Music did not open a session with this account.</string>
     <string name="google_signin_retry">Try again</string>
     <string name="google_session_closed">Google closed the YouTube Music session. Connect the account again in Settings → Accounts.</string>
-    <string name="home_youtube_playlists">YouTube Music playlists</string>
     <string name="youtube_playlist_account">On my YouTube Music account</string>
     <string name="youtube_playlist_public">Public</string>
     <string name="youtube_playlist_edit">Edit YouTube Music playlist</string>

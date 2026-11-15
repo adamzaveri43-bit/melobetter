@@ -51,6 +51,9 @@ object YouTubeLibrary {
         return playlists.distinctBy(Music::id)
     }
 
+    /** A browse page as the account sees it (the personalized home, for instance). */
+    internal fun browse(body: JSONObject): JSONObject = request("browse", body)
+
     /** A playlist as the account sees it, private ones included, with its row identifiers. */
     fun playlist(playlistId: String, limit: Int = MAX_TRACKS): YouTubeAccountPlaylist {
         val id = playlistId.removePrefix(YTM_PLAYLIST_PREFIX).removePrefix("VL")

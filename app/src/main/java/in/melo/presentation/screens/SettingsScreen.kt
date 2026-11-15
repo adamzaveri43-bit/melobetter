@@ -655,10 +655,7 @@ private fun shelfName(shelf: `in`.melo.data.preferences.HomeShelf): String = str
     `in`.melo.data.preferences.HomeShelf.RECENT -> R.string.home_recent
     `in`.melo.data.preferences.HomeShelf.DOWNLOADS -> R.string.home_downloads
     `in`.melo.data.preferences.HomeShelf.LIKED -> R.string.liked_title
-    `in`.melo.data.preferences.HomeShelf.PLAYLISTS -> R.string.home_playlists
-    `in`.melo.data.preferences.HomeShelf.MULTI_SERVICE -> R.string.home_multi_service
-    `in`.melo.data.preferences.HomeShelf.SPOTIFY_PLAYLISTS -> R.string.home_spotify_playlists
-    `in`.melo.data.preferences.HomeShelf.YOUTUBE_PLAYLISTS -> R.string.home_youtube_playlists
+    `in`.melo.data.preferences.HomeShelf.FEED -> R.string.home_feed
     `in`.melo.data.preferences.HomeShelf.ALBUMS -> R.string.home_albums
     `in`.melo.data.preferences.HomeShelf.ARTISTS -> R.string.home_artists
     `in`.melo.data.preferences.HomeShelf.LOCAL_FILES -> R.string.home_local_files

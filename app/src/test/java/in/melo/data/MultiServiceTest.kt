@@ -226,7 +226,8 @@ class MultiServiceTest {
             `in`.melo.data.preferences.ShelfConfig(`in`.melo.data.preferences.HomeShelf.PINS, false, `in`.melo.data.preferences.ShelfStyle.PILLS, 10),
         )
         val decoded = `in`.melo.data.preferences.HomeLayout.decode(`in`.melo.data.preferences.HomeLayout.encode(chosen))
-        assertEquals(chosen, decoded.take(2))
+        // Missing shelves are placed after the shelf they follow by default; the chosen ones keep their order and settings.
+        assertEquals(chosen, decoded.filter { config -> chosen.any { it.shelf == config.shelf } })
         assertEquals(`in`.melo.data.preferences.HomeShelf.entries.toSet(), decoded.map { it.shelf }.toSet())
         // A style a shelf does not support falls back to its default.
         val wrong = `in`.melo.data.preferences.HomeLayout.decode("""[{"shelf":"liked","style":"grid","visible":true,"count":4}]""")
